@@ -159,3 +159,10 @@ dmypy.json
 cython_debug/
 
 .python-version
+
+\*.DS_store
+\*/all_data/
+\*/data/
+\*/attack_artifacts/
+\*/models/
+.idea/

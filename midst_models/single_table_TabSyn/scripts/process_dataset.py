@@ -161,7 +161,7 @@ def process_data(name, info_path, data_dir):
     cat_columns = [column_names[i] for i in cat_col_idx]
     target_columns = [column_names[i] for i in target_col_idx]
 
-    if info["test_path"]:
+    if "test_path" in info:
         # if testing data is given
         test_path = info["test_path"]
         test_df = pd.read_csv(test_path)

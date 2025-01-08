@@ -19,6 +19,7 @@ pre-commit = "^3.7.0"
 ipykernel = "^6.29.4"
 xlrd = "^2.0.1"
 gdown = "^5.2.0"
+faiss = "^1.5.3"
 
 [tool.poetry.group.synthcity.dependencies]
 torch= "1.13.1"

@@ -7,17 +7,17 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 
-from midst_models.single_table_TabSyn.src.tabsyn.model.modules import (
+from src.tabsyn.model.modules import (
     MLPDiffusion,
     Model,
 )
-from midst_models.single_table_TabSyn.src.tabsyn.model.utils import sample
-from midst_models.single_table_TabSyn.src.tabsyn.model.vae import (
+from src.tabsyn.model.utils import sample
+from src.tabsyn.model.vae import (
     Decoder_model,
     Encoder_model,
     Model_VAE,
 )
-from midst_models.single_table_TabSyn.src.tabsyn.utils import (
+from src.tabsyn.utils import (
     recover_data,
     split_num_cat_target,
 )
@@ -238,6 +238,34 @@ class TabSyn:
         torch.save(self.pre_decoder.state_dict(), decoder_save_path)
 
         print("Successfully trained and saved the VAE model!")
+
+    def attack_vae(self, X_test_num_challenge, X_test_cat_challenge):
+
+        challenge_mse_loss = []
+        challenge_ce_loss = []
+        challenge_kl_loss = []
+        challenge_acc = []
+
+        with torch.no_grad():
+            for i in range(X_test_num_challenge.shape[0]):
+                x_test_num, x_test_cat = X_test_num_challenge[i:i + 1], X_test_cat_challenge[i:i + 1]
+                Recon_X_num, Recon_X_cat, mu_z, std_z = self.vae_model(
+                    x_test_num, x_test_cat
+                )
+                val_mse_loss, val_ce_loss, val_kl_loss, val_acc = self.compute_loss(
+                    x_test_num,
+                    x_test_cat,
+                    Recon_X_num,
+                    Recon_X_cat,
+                    mu_z,
+                    std_z,
+                )
+                challenge_mse_loss.append(val_mse_loss.item())
+                challenge_ce_loss.append(val_ce_loss.item())
+                challenge_kl_loss.append(val_kl_loss.item())
+                challenge_acc.append(val_acc.item())
+            # val_loss = val_mse_loss.item() * 0 + val_ce_loss.item()
+            return challenge_mse_loss, challenge_ce_loss, challenge_kl_loss, challenge_acc
 
     def compute_loss(self, X_num, X_cat, Recon_X_num, Recon_X_cat, mu_z, logvar_z):
         ce_loss_fn = nn.CrossEntropyLoss()

@@ -20,7 +20,12 @@ S_max = float("inf")
 S_noise = 1
 
 
-def sample(net, num_samples, dim, num_steps=50, device="cuda:0"):
+# def sample(net, num_samples, dim, num_steps=50, device="cuda:0"):
+def sample(net, num_samples, dim, num_steps=50, device="cpu"):
+    print(device)
+    # if torch.backends.mps.is_available():
+    #     print("MPS is available!")
+    #     device = torch.device("mps")
     latents = torch.randn([num_samples, dim], device=device)
 
     step_indices = torch.arange(num_steps, dtype=torch.float32, device=latents.device)

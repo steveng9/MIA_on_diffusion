@@ -27,5 +27,6 @@
         3
     ],
     "file_type": "csv",
-    "data_path": "/projects/aieng/midst_competition/data/tabsyn/all_data/raw_data/train.csv"
+    "data_path": "/Users/golobs/PycharmProjects/MIDSTModels/data/tabsyn_white_box/train/tabsyn_1/trans.csv",
+    "test_path": "/Users/golobs/PycharmProjects/MIDSTModels/data/tabsyn_white_box/train/tabsyn_1/trans.csv"
 }
