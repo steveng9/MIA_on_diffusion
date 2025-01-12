@@ -22,6 +22,7 @@ S_noise = 1
 
 # def sample(net, num_samples, dim, num_steps=50, device="cuda:0"):
 def sample(net, num_samples, dim, num_steps=50, device="cpu"):
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(device)
     # if torch.backends.mps.is_available():
     #     print("MPS is available!")
