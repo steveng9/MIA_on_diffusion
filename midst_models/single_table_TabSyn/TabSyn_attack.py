@@ -70,6 +70,8 @@ def attack_VAE():
     config_path = "src/configs/trans.toml"
     raw_config = load_config(config_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        print("Using CUDA device!")
     # if torch.backends.mps.is_available():
     #     print("MPS Available!")
     # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
