@@ -1,5 +1,6 @@
 from sklearn.metrics import roc_curve, roc_auc_score
 import pickle
+import sys
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -29,12 +30,12 @@ def activate_4(p_rel, confidence=1, center=True) -> np.ndarray:
     return probabilities
 
 threat_model = "black_box"
-model_num = 1
+model_num = sys.argv[1]
 
-with open("attack_artifacts/loss_results/model1/synth_losses1.pkl", "rb") as f:
+with open(f"attack_artifacts/loss_results/model{model_num}/synth_losses_{model_num}.pkl", "rb") as f:
     synth_losses = pickle.load(f)
     challenge_mse_lossS, challenge_ce_lossS, challenge_kl_lossS, challenge_accS = synth_losses
-with open("attack_artifacts/loss_results/model1/aux_losses1.pkl", "rb") as f:
+with open(f"attack_artifacts/loss_results/model{model_num}/aux_losses_{model_num}.pkl", "rb") as f:
     aux_losses = pickle.load(f)
     challenge_mse_lossA, challenge_ce_lossA, challenge_kl_lossA, challenge_accA = aux_losses
 
