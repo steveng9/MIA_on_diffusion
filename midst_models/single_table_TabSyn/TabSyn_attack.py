@@ -22,6 +22,7 @@ warnings.filterwarnings("ignore")
 
 num_epochs = int(sys.argv[1])
 save_results = sys.argv[2] == "save"
+model_number = int(sys.argv[3])
 
 
 def main():
@@ -36,7 +37,7 @@ def attack_VAE():
     print()
 
     threat_model = "black_box"
-    model_num = 1
+    model_num = model_number
 
     INFO_DIR = "data_info"
     ATTACK_ARTIFACTS = "attack_artifacts/"
