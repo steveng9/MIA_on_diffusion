@@ -23,6 +23,8 @@ warnings.filterwarnings("ignore")
 num_epochs = int(sys.argv[1])
 save_results = sys.argv[2] == "save"
 model_number = int(sys.argv[3])
+loss_from_synth = sys.argv[4] == "s"
+loss_from_aux = sys.argv[5] == "a"
 
 
 def main():
@@ -78,17 +80,19 @@ def attack_VAE():
 
     _, X_train_num_c, X_train_cat_c, X_test_num_c, X_test_cat_c, categories_c, d_numerical_c = preprocess_for_attack(raw_config, device, DATA_DIR_CHALLENGE + "processed_data/trans/", DATA_DIR_ALL)
 
-    tabsyn_synth = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_S, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_SYNTH + "processed_data/trans/", DATA_DIR_ALL))
-    challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s = tabsyn_synth.attack_vae(X_test_num_c, X_test_cat_c)
-    if save_results:
-        with open(LOSS_RESULTS + f'synth_losses_{model_num}.pkl', 'wb') as file:
-            pickle.dump((challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s), file)
+    if loss_from_synth:
+        tabsyn_synth = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_S, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_SYNTH + "processed_data/trans/", DATA_DIR_ALL))
+        challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s = tabsyn_synth.attack_vae(X_test_num_c, X_test_cat_c)
+        if save_results:
+            with open(LOSS_RESULTS + f'synth_losses_{model_num}.pkl', 'wb') as file:
+                pickle.dump((challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s), file)
 
-    tabsyn_aux = train_vae_for_attack(raw_config, device, num_epochs//3, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
-    challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a = tabsyn_aux.attack_vae(X_test_num_c, X_test_cat_c)
-    if save_results:
-        with open(LOSS_RESULTS + f'aux_losses_{model_num}.pkl', 'wb') as file:
-            pickle.dump((challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a), file)
+    if loss_from_aux:
+        tabsyn_aux = train_vae_for_attack(raw_config, device, num_epochs//3, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
+        challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a = tabsyn_aux.attack_vae(X_test_num_c, X_test_cat_c)
+        if save_results:
+            with open(LOSS_RESULTS + f'aux_losses_{model_num}.pkl', 'wb') as file:
+                pickle.dump((challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a), file)
 
 
 def preprocess_for_attack(raw_config, device, data_dir, data_dir_all):
