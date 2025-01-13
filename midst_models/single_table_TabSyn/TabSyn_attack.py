@@ -4,7 +4,6 @@ import os
 import json
 import pandas as pd
 import numpy as np
-from pprint import pprint
 import pickle
 
 import torch
@@ -77,15 +76,16 @@ def attack_VAE():
     # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     _, X_train_num_c, X_train_cat_c, X_test_num_c, X_test_cat_c, categories_c, d_numerical_c = preprocess_for_attack(raw_config, device, DATA_DIR_CHALLENGE + "processed_data/trans/", DATA_DIR_ALL)
-    tabsyn_synth = train_vae_for_attack(raw_config, device, MODEL_PATH_S, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_SYNTH + "processed_data/trans/", DATA_DIR_ALL))
-    tabsyn_aux = train_vae_for_attack(raw_config, device, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
 
+    tabsyn_synth = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_S, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_SYNTH + "processed_data/trans/", DATA_DIR_ALL))
     challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s = tabsyn_synth.attack_vae(X_test_num_c, X_test_cat_c)
-    challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a = tabsyn_aux.attack_vae(X_test_num_c, X_test_cat_c)
-
     if save_results:
         with open(LOSS_RESULTS + f'synth_losses_{model_num}.pkl', 'wb') as file:
             pickle.dump((challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s), file)
+
+    tabsyn_aux = train_vae_for_attack(raw_config, device, num_epochs//3, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
+    challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a = tabsyn_aux.attack_vae(X_test_num_c, X_test_cat_c)
+    if save_results:
         with open(LOSS_RESULTS + f'aux_losses_{model_num}.pkl', 'wb') as file:
             pickle.dump((challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a), file)
 
@@ -109,7 +109,7 @@ def preprocess_for_attack(raw_config, device, data_dir, data_dir_all):
 
 
 
-def train_vae_for_attack(raw_config, device, model_path, data_name, processed_data_artifacts):
+def train_vae_for_attack(raw_config, device, epochs, model_path, data_name, processed_data_artifacts):
     train_data, X_train_num, X_train_cat, X_test_num, X_test_cat, d_numerical, categories = processed_data_artifacts
     train_loader = DataLoader(
         train_data,
@@ -132,7 +132,7 @@ def train_vae_for_attack(raw_config, device, model_path, data_name, processed_da
     tabsyn.train_vae(
         **raw_config["loss_params"],
         # num_epochs=raw_config["train"]["vae"]["num_epochs"],
-        num_epochs=num_epochs,
+        num_epochs=epochs,
         save_path=os.path.join(model_path, data_name, "vae"),
     )
     tabsyn.save_vae_embeddings(
