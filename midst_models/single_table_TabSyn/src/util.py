@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Union, cast
 
 import tomli
-import tomli_w
+# import tomli_w
 
 RawConfig = Dict[str, Any]
 
@@ -52,13 +52,13 @@ def load_config(path: Union[Path, str]) -> Any:
     with open(path, "rb") as f:
         return unpack_config(tomli.load(f))
 
-
-def dump_config(config: Any, path: Union[Path, str]) -> None:
-    with open(path, "wb") as f:
-        tomli_w.dump(pack_config(config), f)
-    # check that there are no bugs in all these "pack/unpack" things
-    assert config == load_config(path)
-
+#
+# def dump_config(config: Any, path: Union[Path, str]) -> None:
+#     with open(path, "wb") as f:
+#         tomli_w.dump(pack_config(config), f)
+#     # check that there are no bugs in all these "pack/unpack" things
+#     assert config == load_config(path)
+#
 
 def load_json(path: Union[Path, str], **kwargs) -> Any:
     return json.loads(Path(path).read_text(), **kwargs)
