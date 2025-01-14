@@ -201,7 +201,7 @@ def score_VAE_attack(losses_synth, losses_aux):
 
 def train_aux_VAE():
     print()
-    print(f"training Auxiliary VAE with {num_epochs} epochs!!!")
+    print(f"training Auxiliary VAE with {num_aux_epochs} epochs!!!")
     print()
     print()
 
@@ -224,7 +224,7 @@ def train_aux_VAE():
     if torch.cuda.is_available():
         print("Using CUDA device!")
 
-    tabsyn_vae_aux = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
+    tabsyn_vae_aux = train_vae_for_attack(raw_config, device, num_aux_epochs, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
     dump_artifact(tabsyn_vae_aux, MODEL_PATH_A + f"/tabsyn_vae_aux_{num_aux_epochs}")
 
 
