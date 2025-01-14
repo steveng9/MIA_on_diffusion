@@ -23,8 +23,10 @@ warnings.filterwarnings("ignore")
 
 
 
-# python vae_attack.py 1000 train_synth 1 dont_save
+verbose = False
 num_aux_epochs = 1000
+
+# python vae_attack.py 1000 train_synth 1 dont_save
 num_epochs = int(sys.argv[1])
 train_aux = sys.argv[2] == "train_aux"
 train_new_synth = sys.argv[2] == "train_synth"
@@ -66,10 +68,7 @@ def attack_VAE():
     challenge = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_with_id.csv", header="infer")
     aux = pd.read_csv(f"../../data/auxiliary_inferred/trans_aux.csv", header="infer")
 
-    tabsyn_vae_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_{num_aux_epochs}")
-
-    with open(f"data/processed_data/trans/info.json", "r") as file:
-        data_info = json.load(file)
+    tabsyn_vae_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_e{num_aux_epochs}")
 
     train.drop(columns=["trans_id", "account_id"], inplace=True)
     challenge.drop(columns=["trans_id", "account_id"], inplace=True)
@@ -83,6 +82,8 @@ def attack_VAE():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if torch.cuda.is_available():
         print("Using CUDA device!")
+    else:
+        print("NOT Using CUDA!")
     # if torch.backends.mps.is_available():
     #     print("MPS Available!")
     # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -225,7 +226,7 @@ def train_aux_VAE():
         print("Using CUDA device!")
 
     tabsyn_vae_aux = train_vae_for_attack(raw_config, device, num_aux_epochs, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
-    dump_artifact(tabsyn_vae_aux, MODEL_PATH_A + f"/tabsyn_vae_aux_{num_aux_epochs}")
+    dump_artifact(tabsyn_vae_aux, MODEL_PATH_A + f"/tabsyn_vae_aux_e{num_aux_epochs}")
 
 
 
@@ -840,20 +841,21 @@ def modified_process_data(name, info_path, data_dir, data_df):
     with open(f"{processed_data_dir}/{name}/info.json", "w") as file:
         json.dump(info, file, indent=4)
 
-    print(f"Processing and Saving {name} Successfully!")
+    if verbose:
+        print(f"Processing and Saving {name} Successfully!")
 
-    print("Dataset Name:", name)
-    print("Total Size:", info["train_num"] + info["test_num"])
-    print("Train Size:", info["train_num"])
-    print("Test Size:", info["test_num"])
-    if info["task_type"] == "regression":
-        num = len(info["num_col_idx"] + info["target_col_idx"])
-        cat = len(info["cat_col_idx"])
-    else:
-        cat = len(info["cat_col_idx"] + info["target_col_idx"])
-        num = len(info["num_col_idx"])
-    print("Number of Numerical Columns:", num)
-    print("Number of Categorical Columns:", cat)
+        print("Dataset Name:", name)
+        print("Total Size:", info["train_num"] + info["test_num"])
+        print("Train Size:", info["train_num"])
+        print("Test Size:", info["test_num"])
+        if info["task_type"] == "regression":
+            num = len(info["num_col_idx"] + info["target_col_idx"])
+            cat = len(info["cat_col_idx"])
+        else:
+            cat = len(info["cat_col_idx"] + info["target_col_idx"])
+            num = len(info["num_col_idx"])
+        print("Number of Numerical Columns:", num)
+        print("Number of Categorical Columns:", cat)
 
 
 
