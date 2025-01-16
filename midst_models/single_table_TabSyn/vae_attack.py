@@ -154,7 +154,7 @@ def train_synth_vae(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     tabsyn_vae_synth = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_S, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_SYNTH + "processed_data/trans/", DATA_DIR_ALL))
-    dump_artifact(tabsyn_vae_synth, MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_e{num_epochs}")
+    dump_artifact(tabsyn_vae_synth, MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_SV{num_epochs}")
 
 
 def attack_VAE(args):
@@ -181,8 +181,8 @@ def attack_VAE(args):
 
     _, X_train_num_c, X_train_cat_c, X_test_num_c, X_test_cat_c, categories_c, d_numerical_c = preprocess_for_attack(raw_config, device, DATA_DIR_CHALLENGE + "processed_data/trans/", DATA_DIR_ALL)
 
-    tabsyn_vae_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_e{args.AV}")
-    tabsyn_vae_synth = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_e{args.SV}")
+    tabsyn_vae_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_AV{args.AV}")
+    tabsyn_vae_synth = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_SV{args.SV}")
 
     losses_synth = tabsyn_vae_synth.attack_vae(X_test_num_c, X_test_cat_c)
     losses_aux = tabsyn_vae_aux.attack_vae(X_test_num_c, X_test_cat_c)
@@ -218,7 +218,7 @@ def train_synth_diffusion(args):
     DATA_NAME = "trans/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
 
-    tabsyn_synth_vae = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_e{num_epochs_SV}")
+    tabsyn_synth_vae = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_SV{num_epochs_SV}")
     tabsyn_synth = train_diffusion_for_attack(tabsyn_synth_vae, num_epochs_SD, MODEL_PATH_S, DATA_NAME)
     dump_artifact(tabsyn_synth, MODEL_PATH_S + f"/tabsyn_diffus_synth_m{model_num}_SV{num_epochs_SV}_SD{num_epochs_SD}")
 
