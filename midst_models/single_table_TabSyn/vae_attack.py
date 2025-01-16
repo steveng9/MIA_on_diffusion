@@ -5,6 +5,8 @@ import json
 import pandas as pd
 import numpy as np
 import pickle
+
+from numpy import mean
 from scipy import stats
 from argparse import Namespace
 from os import listdir
@@ -254,7 +256,7 @@ def attack_diffusion(args):
     losses_s, predictions_s = encode_and_attack_challenge_points(tabsyn_synth, X_train_num_c, X_train_cat_c)
     losses_a, predictions_a = encode_and_attack_challenge_points(tabsyn_aux, X_train_num_c, X_train_cat_c)
 
-    score_diffusion_attack(losses_s, losses_a, predictions_s, predictions_a)
+    score_diffusion_attack(model_num, losses_s, losses_a, predictions_s, predictions_a)
 
     '''
     ## Load pretrained model
@@ -390,16 +392,13 @@ def score_VAE_attack(model_num, losses_synth, losses_aux):
     prediction_kl = 1 - np.array(activate_3(ratio_kl))
     prediction_acc = 1 - np.array(activate_3(ratio_acc))
 
-    desired_fpr = 0.1
     print("\n\n\nATTACK SCORES:")
     for name, pred in [("MSE", prediction_mse), ("CE", prediction_ce), ("MSE+CE", ens_prediction), ("KL", prediction_kl)]:  # , prediction_acc]:
-        fpr, tpr, thresholds = roc_curve(membership, pred)
-        tpr_at_desired_fpr = np.interp(desired_fpr, fpr, tpr)
-        auc = roc_auc_score(membership, pred)
-        print(name, tpr_at_desired_fpr, auc)
+        tpr, auc = get_tpr_at_fpr(membership, pred)
+        print(name, tpr, auc)
     scores = (prediction_mse, prediction_ce, ens_prediction, prediction_kl)
 
-    return scores, tpr_at_desired_fpr, auc
+    return scores, tpr, auc
 
 def encode_and_attack_challenge_points(tabsyn_model, X_train_num_c, X_train_cat_c):
     z_c = tabsyn_model.pre_encoder(X_train_num_c, X_train_cat_c)
@@ -440,8 +439,40 @@ def train_diffusion_for_attack(tabsyn_model, num_epochs, model_path, data_name):
     )
     return tabsyn_model
 
-def score_diffusion_attack(losses_s, losses_a, predictions_s, predictions_a):
+def score_diffusion_attack(model_num, losses_s, losses_a, predictions_s, predictions_a):
     threat_model = "black_box"
+
+    membership = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_label.csv", header="infer")
+    membership = membership['is_train'].tolist()
+
+    tpr_ls = []
+    auc_ls = []
+    tpr_ps = []
+    auc_ps = []
+    for t in range(len(losses_s)):
+        zeta_loss = losses_s[t] / losses_a[t]
+        zeta_predictions = predictions_s[t] / predictions_a[t]
+
+        activated_zeta_loss = activate_3(np.array(zeta_loss))
+        activated_zeta_predictions = activate_3(np.array(zeta_predictions))
+
+        tpr_l, auc_l = get_tpr_at_fpr(membership, activated_zeta_loss)
+        tpr_p, auc_p = get_tpr_at_fpr(membership, activated_zeta_predictions)
+        print(f"{t+1}: \t{tpr_l:.4f}\t{auc_l:.4f}\t\t{tpr_p:.4f}\t{auc_p:.4f}")
+        tpr_ls.append(tpr_l)
+        auc_ls.append(auc_l)
+        tpr_ps.append(tpr_p)
+        auc_ps.append(auc_p)
+
+    print(f"\n{mean(tpr_ls)}\t{mean(auc_ls)}\t{mean(tpr_ps)}\t{mean(auc_ps)}")
+
+
+def get_tpr_at_fpr(y_true, y_pred):
+    desired_fpr = 0.1
+    fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+    tpr_at_desired_fpr = np.interp(desired_fpr, fpr, tpr)
+    auc = roc_auc_score(y_true, y_pred)
+    return tpr_at_desired_fpr, auc
 
 def modified_process_data(name, info_path, data_dir, data_df):
 

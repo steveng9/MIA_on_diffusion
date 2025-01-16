@@ -387,8 +387,8 @@ class TabSyn:
             for t in T_set:
                 inputs = latent_challenge_points.float().to(self.device)
                 loss, predicted_noise = self.dif_model.attack(inputs, t)
-                challenge_loss.append(loss)
-                challenge_noise.append(predicted_noise)
+                challenge_loss.append(loss.mean(1).cpu().numpy())
+                challenge_noise.append(predicted_noise.mean(1).cpu().numpy())
 
         return challenge_loss, challenge_noise
 

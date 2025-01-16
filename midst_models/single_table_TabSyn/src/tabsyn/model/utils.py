@@ -210,11 +210,11 @@ class AttackEDMLoss:
 
     def __call__(self, denoise_fn, data, t):
 
-        t_tensor = torch.full((data.shape[0], 1), t)
+        t_tensor = torch.full((data.shape[0],), t)
         weight = (t_tensor**2 + self.sigma_data**2) / (t_tensor * self.sigma_data) ** 2
 
         y = data
-        noise = torch.randn_like(y) * t_tensor
+        noise = torch.randn_like(y) * t_tensor.unsqueeze(1)
         D_yn = denoise_fn(y + noise, t_tensor)
         target = y
         loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
