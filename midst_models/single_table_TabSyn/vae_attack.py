@@ -72,6 +72,7 @@ def main():
     elif args.action == 'aux_diff': train_aux_diffusion(args)
     elif args.action == 'synth_diff': train_synth_diffusion(args)
     elif args.action == 'attack_diff': attack_diffusion(args)
+    else: raise ValueError(f"Invalid action: {args.action}")
 
 
 def list_all_pretrained_models(args):
@@ -217,7 +218,7 @@ def train_synth_diffusion(args):
     DATA_NAME = "trans/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
 
-    tabsyn_synth_vae = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_e{num_epochs_SV}")
+    tabsyn_synth_vae = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_e{num_epochs_SV}")
     tabsyn_synth = train_diffusion_for_attack(tabsyn_synth_vae, num_epochs_SD, MODEL_PATH_S, DATA_NAME)
     dump_artifact(tabsyn_synth, MODEL_PATH_S + f"/tabsyn_diffus_synth_SV{num_epochs_SV}_SD{num_epochs_SD}")
 
