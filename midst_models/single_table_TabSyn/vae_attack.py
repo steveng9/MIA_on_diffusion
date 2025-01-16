@@ -166,7 +166,7 @@ def attack_VAE(args):
     INFO_DIR = "data_info"
     ATTACK_ARTIFACTS = "attack_artifacts/"
 
-    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/model{model_num}/data_all/"
+    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/modelAUX/data_all/"
     DATA_DIR_CHALLENGE = ATTACK_ARTIFACTS + f"data/model{model_num}/data_challenge/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
     MODEL_PATH_A = ATTACK_ARTIFACTS + f"models/modelAUX/tabsynA"
