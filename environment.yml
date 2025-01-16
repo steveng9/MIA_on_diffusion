@@ -1,0 +1,40 @@
+#name: myenv
+channels:
+  - pytorch
+  - nvidia
+  - defaults
+  - conda-forge
+dependencies:
+  - python>=3.9.0,<3.10
+  - ipykernel=6.29.4
+  - xlrd=2.0.1
+  - gdown=5.2.0
+  - matplotlib=3.8.0  # Adjusted to the latest available version
+  - faiss-cpu  # Replace faiss with faiss-cpu for broader compatibility
+  - category-encoders  # Install from pip if not found
+  - pandas=1.5.3
+  - scikit-learn=1.5.0
+  - numpy=1.23.5
+  - scipy=1.13.1
+  - tqdm=4.66.4
+  - transformers=4.41.2
+  - xgboost=1.7.6
+  - torch=1.13.1
+#  - torchvision=0.14.1
+#  - torchmetrics=1.4.0.post0
+#  - torchtext=0.14.1
+#  - pytorch-lightning=1.9.5
+  - spacy=3.7.5
+  - statsmodels=0.14.2
+  - hydra-core=1.3.2
+  - omegaconf=2.3.0
+
+  # CUDA Toolkit dependencies
+#  - cudatoolkit=11.7
+
+  # Optional pip dependencies
+  - pip:
+      - accelerate==0.31.0
+      - sdv==1.11.0
+      - faiss-gpu==1.7.2
+      - typer==0.12.3

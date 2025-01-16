@@ -140,7 +140,7 @@ def train_synth_vae(args):
     INFO_DIR = "data_info"
     ATTACK_ARTIFACTS = "attack_artifacts/"
     DATA_NAME = "trans/"
-    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/model{model_num}/data_all/"
+    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/modelAUX/data_all/"
     DATA_DIR_SYNTH = ATTACK_ARTIFACTS + f"data/model{model_num}/data_synth/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
     LOSS_RESULTS = ATTACK_ARTIFACTS + f"loss_results/model{model_num}/"
