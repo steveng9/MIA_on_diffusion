@@ -233,13 +233,19 @@ def attack_diffusion(args):
     num_epochs_SD = args.SD
     print(f"\nAttacking Denoiser, epochs: {num_epochs_AV}, {num_epochs_SV}, {num_epochs_AD}, {num_epochs_SD}\n\n")
 
+    threat_model = "black_box"
     ATTACK_ARTIFACTS = "attack_artifacts/"
+    INFO_DIR = "data_info"
     DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/modelAUX/data_all/"
     DATA_DIR_CHALLENGE = ATTACK_ARTIFACTS + f"data/model{model_num}/data_challenge/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
     MODEL_PATH_A = ATTACK_ARTIFACTS + f"models/modelAUX/tabsynA"
     LOSS_RESULTS = ATTACK_ARTIFACTS + f"loss_results/model{model_num}/"
     os.makedirs(LOSS_RESULTS, exist_ok=True)
+
+    challenge = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_with_id.csv", header="infer")
+    challenge.drop(columns=["trans_id", "account_id"], inplace=True)
+    modified_process_data("trans", INFO_DIR, DATA_DIR_CHALLENGE, challenge)
 
     config_path = "src/configs/trans.toml"
     raw_config = load_config(config_path)
