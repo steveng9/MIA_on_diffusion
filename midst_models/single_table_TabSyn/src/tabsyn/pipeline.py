@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
+from scipy.stats import norm
 
 from src.tabsyn.model.modules import (
     MLPDiffusion,
@@ -365,6 +366,32 @@ class TabSyn:
 
         end_time = time.time()
         print("Time: ", end_time - start_time)
+
+    def attack_diffusion(self, latent_challenge_points):
+
+        mean = -1.2
+        # std_dev should really be 1.2 to match EDMLoss implementation, but 1.7 assures that
+        # we cover a wider range of t's that were likely seen in training.
+        std_dev = 1.8
+        num_points = 30
+        # Generate evenly spaced probabilities
+        probabilities = np.linspace(0, 1, num_points, endpoint=False)[1:]  # Avoid 0 and 1
+        sigmas = norm.ppf(probabilities, loc=mean, scale=std_dev)
+        T_set = np.exp(sigmas)
+
+        challenge_loss = []
+        challenge_noise = []
+        challenge_PIAn_loss = []
+
+        with torch.no_grad():
+            for t in T_set:
+                inputs = latent_challenge_points.float().to(self.device)
+                loss, predicted_noise = self.dif_model.attack(inputs, t)
+                challenge_loss.append(loss)
+                challenge_noise.append(predicted_noise)
+
+        return challenge_loss, challenge_noise
+
 
     def load_model_state(self, ckpt_dir, dif_ckpt_name="model.pt"):
         dif_model_save_path = os.path.join(ckpt_dir, dif_ckpt_name)

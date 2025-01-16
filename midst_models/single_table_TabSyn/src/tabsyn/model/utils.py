@@ -195,3 +195,33 @@ class EDMLoss:
         loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
 
         return loss
+
+
+class AttackEDMLoss:
+    def __init__(
+        self, P_mean=-1.2, P_std=1.2, sigma_data=0.5, hid_dim=100, gamma=5, opts=None
+    ):
+        self.P_mean = P_mean
+        self.P_std = P_std
+        self.sigma_data = sigma_data
+        self.hid_dim = hid_dim
+        self.gamma = gamma
+        self.opts = opts
+
+    def __call__(self, denoise_fn, data, t):
+
+        t_tensor = torch.full((data.shape[0], 1), t)
+        weight = (t_tensor**2 + self.sigma_data**2) / (t_tensor * self.sigma_data) ** 2
+
+        y = data
+        noise = torch.randn_like(y) * t_tensor
+        D_yn = denoise_fn(y + noise, t_tensor)
+        target = y
+        loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
+
+        # TODO: square this value to be non-negative?
+        predicted_noise = np.abs(y - denoise_fn(y, t_tensor))
+
+        # TODO add PIAn equation
+
+        return loss, predicted_noise

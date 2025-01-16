@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim
 from torch import Tensor
 
-from src.tabsyn.model.utils import EDMLoss
+from src.tabsyn.model.utils import EDMLoss, AttackEDMLoss
 
 ModuleType = Union[str, Callable[..., nn.Module]]
 
@@ -193,7 +193,16 @@ class Model(nn.Module):
         self.loss_fn = EDMLoss(
             P_mean, P_std, sigma_data, hid_dim=hid_dim, gamma=5, opts=None
         )
+        self.attack_loss_fn = AttackEDMLoss(
+            P_mean, P_std, sigma_data, hid_dim=hid_dim, gamma=5, opts=None
+        )
 
     def forward(self, x):
         loss = self.loss_fn(self.denoise_fn_D, x)
         return loss.mean(-1).mean()
+
+    def attack(self, x, t):
+        loss, predicted_noise = self.attack_loss_fn(self.denoise_fn_D, x, t)
+        # TODO: do I want to take this mean?
+        # return loss.mean(-1).mean(), predicted_noise
+        return loss, predicted_noise
