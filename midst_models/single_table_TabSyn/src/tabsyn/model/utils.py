@@ -210,7 +210,7 @@ class AttackEDMLoss:
 
     def __call__(self, denoise_fn, data, t):
 
-        t_tensor = torch.full((data.shape[0],), t)
+        t_tensor = torch.full((data.shape[0],), t).to(data.device)
         weight = (t_tensor**2 + self.sigma_data**2) / (t_tensor * self.sigma_data) ** 2
 
         y = data
@@ -220,7 +220,7 @@ class AttackEDMLoss:
         loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
 
         # TODO: square this value to be non-negative?
-        predicted_noise = np.abs(y - denoise_fn(y, t_tensor))
+        predicted_noise = np.abs((y - denoise_fn(y, t_tensor)).cpu())
 
         # TODO add PIAn equation
 
