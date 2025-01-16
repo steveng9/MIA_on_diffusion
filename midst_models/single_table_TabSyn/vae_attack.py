@@ -234,7 +234,7 @@ def attack_diffusion(args):
     print(f"\nAttacking Denoiser, epochs: {num_epochs_AV}, {num_epochs_SV}, {num_epochs_AD}, {num_epochs_SD}\n\n")
 
     ATTACK_ARTIFACTS = "attack_artifacts/"
-    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/model{model_num}/data_all/"
+    DATA_DIR_ALL = ATTACK_ARTIFACTS + f"data/modelAUX/data_all/"
     DATA_DIR_CHALLENGE = ATTACK_ARTIFACTS + f"data/model{model_num}/data_challenge/"
     MODEL_PATH_S = ATTACK_ARTIFACTS + f"models/model{model_num}/tabsynS"
     MODEL_PATH_A = ATTACK_ARTIFACTS + f"models/modelAUX/tabsynA"
