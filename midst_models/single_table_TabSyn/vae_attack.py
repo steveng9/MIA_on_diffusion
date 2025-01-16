@@ -128,7 +128,7 @@ def train_aux_vae(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     tabsyn_vae_aux = train_vae_for_attack(raw_config, device, num_epochs, MODEL_PATH_A, DATA_NAME, preprocess_for_attack(raw_config, device, DATA_DIR_ALL + "processed_data/trans_all/", DATA_DIR_ALL))
-    dump_artifact(tabsyn_vae_aux, MODEL_PATH_A + f"/tabsyn_vae_aux_e{num_epochs}")
+    dump_artifact(tabsyn_vae_aux, MODEL_PATH_A + f"/tabsyn_vae_aux_AV{num_epochs}")
 
 
 def train_synth_vae(args):
@@ -204,7 +204,7 @@ def train_aux_diffusion(args):
     DATA_NAME = "trans/"
     MODEL_PATH_A = ATTACK_ARTIFACTS + f"models/modelAUX/tabsynA"
 
-    tabsyn_aux_vae = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_e{num_epochs_AV}")
+    tabsyn_aux_vae = load_artifact(MODEL_PATH_A + f"/tabsyn_vae_aux_AV{num_epochs_AV}")
     tabsyn_aux = train_diffusion_for_attack(tabsyn_aux_vae, num_epochs_AD, MODEL_PATH_A, DATA_NAME)
     dump_artifact(tabsyn_aux, MODEL_PATH_A + f"/tabsyn_diffus_aux_AV{num_epochs_AV}_AD{num_epochs_AD}")
 
