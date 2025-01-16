@@ -220,7 +220,7 @@ def train_synth_diffusion(args):
 
     tabsyn_synth_vae = load_artifact(MODEL_PATH_S + f"/tabsyn_vae_synth_m{model_num}_e{num_epochs_SV}")
     tabsyn_synth = train_diffusion_for_attack(tabsyn_synth_vae, num_epochs_SD, MODEL_PATH_S, DATA_NAME)
-    dump_artifact(tabsyn_synth, MODEL_PATH_S + f"/tabsyn_diffus_synth_SV{num_epochs_SV}_SD{num_epochs_SD}")
+    dump_artifact(tabsyn_synth, MODEL_PATH_S + f"/tabsyn_diffus_synth_m{model_num}_SV{num_epochs_SV}_SD{num_epochs_SD}")
 
 
 def attack_diffusion(args):
@@ -249,7 +249,7 @@ def attack_diffusion(args):
     X_train_num_c = X_train_num_c.to(device)
     X_train_cat_c = X_train_cat_c.to(device)
 
-    tabsyn_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_diffus_aux_SV{num_epochs_SV}_SD{num_epochs_SD}")
+    tabsyn_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_diffus_aux_m{model_num}_SV{num_epochs_SV}_SD{num_epochs_SD}")
     tabsyn_synth = load_artifact(MODEL_PATH_S + f"/tabsyn_diffus_synth_AV{num_epochs_AV}_AD{num_epochs_AD}")
     losses_s, predictions_s = encode_and_attack_challenge_points(tabsyn_synth, X_train_num_c, X_train_cat_c)
     losses_a, predictions_a = encode_and_attack_challenge_points(tabsyn_aux, X_train_num_c, X_train_cat_c)
