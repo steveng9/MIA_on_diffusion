@@ -99,7 +99,7 @@ def list_all_pretrained_models(args):
     print("\nSynthetic Diffusion models:")
     for i in range(30):
         synth_models_path = f"attack_artifacts/models/model{i+1}/tabsynS/"
-        try: synth_denoisers = [f for f in listdir(synth_models_path) if f.find("vae") != -1]
+        try: synth_denoisers = [f for f in listdir(synth_models_path) if f.find("diffus") != -1]
         except FileNotFoundError: synth_denoisers = []
         if len(synth_denoisers) != 0:
             print(f"\tmodel {i+1}")
