@@ -187,13 +187,13 @@ def attack_VAE(args):
     losses_synth = tabsyn_vae_synth.attack_vae(X_test_num_c, X_test_cat_c)
     losses_aux = tabsyn_vae_aux.attack_vae(X_test_num_c, X_test_cat_c)
 
-    if args.save_score:
-        with open(LOSS_RESULTS + f'synth_losses_SV{args.SV}_m{model_num}.pkl', 'wb') as file:
-            pickle.dump(losses_synth, file)
-        with open(LOSS_RESULTS + f'aux_losses_AV{args.AV}_m{model_num}.pkl', 'wb') as file:
-            pickle.dump(losses_aux, file)
 
-    score_VAE_attack(model_num, losses_synth, losses_aux)
+    scores, tprATfpr, auc = score_VAE_attack(model_num, losses_synth, losses_aux)
+
+    if args.save_score:
+        dump_artifact(losses_synth, LOSS_RESULTS + f'synth_losses_SV{args.SV}_m{model_num}')
+        dump_artifact(losses_aux, LOSS_RESULTS + f'aux_losses_AV{args.AV}_m{model_num}')
+        dump_artifact((scores, tprATfpr, auc), LOSS_RESULTS + f"vae_attack_results_m{model_num}_SV{args.SV}_AV{args.AV}")
 
 
 def train_aux_diffusion(args):
@@ -249,8 +249,8 @@ def attack_diffusion(args):
     X_train_num_c = X_train_num_c.to(device)
     X_train_cat_c = X_train_cat_c.to(device)
 
-    tabsyn_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_diffus_aux_m{model_num}_SV{num_epochs_SV}_SD{num_epochs_SD}")
-    tabsyn_synth = load_artifact(MODEL_PATH_S + f"/tabsyn_diffus_synth_AV{num_epochs_AV}_AD{num_epochs_AD}")
+    tabsyn_aux = load_artifact(MODEL_PATH_A + f"/tabsyn_diffus_aux_AV{num_epochs_AV}_AD{num_epochs_AD}")
+    tabsyn_synth = load_artifact(MODEL_PATH_S + f"/tabsyn_diffus_synth_m{model_num}_SV{num_epochs_SV}_SD{num_epochs_SD}")
     losses_s, predictions_s = encode_and_attack_challenge_points(tabsyn_synth, X_train_num_c, X_train_cat_c)
     losses_a, predictions_a = encode_and_attack_challenge_points(tabsyn_aux, X_train_num_c, X_train_cat_c)
 
@@ -369,19 +369,10 @@ def train_vae_for_attack(raw_config, device, epochs, model_path, data_name, proc
 
 def score_VAE_attack(model_num, losses_synth, losses_aux):
     threat_model = "black_box"
-
-    # with open(f"attack_artifacts/loss_results/model{model_num}/synth_losses_{model_num}.pkl", "rb") as f:
-    #     synth_losses = pickle.load(f)
-    #     challenge_mse_lossS, challenge_ce_lossS, challenge_kl_lossS, challenge_accS = synth_losses
-    # with open(f"attack_artifacts/loss_results/model{model_num}/aux_losses_{model_num}.pkl", "rb") as f:
-    #     aux_losses = pickle.load(f)
-    #     challenge_mse_lossA, challenge_ce_lossA, challenge_kl_lossA, challenge_accA = aux_losses
     challenge_mse_loss_s, challenge_ce_loss_s, challenge_kl_loss_s, challenge_acc_s = losses_synth
     challenge_mse_loss_a, challenge_ce_loss_a, challenge_kl_loss_a, challenge_acc_a = losses_aux
 
-    # challenge = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_with_id.csv", header="infer")
-    membership = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_label.csv",
-                             header="infer")
+    membership = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_label.csv", header="infer")
     membership = membership['is_train'].tolist()
 
     ratio_mse = np.array(challenge_mse_loss_s) / np.where(np.array(challenge_mse_loss_a) < 0.000000001, 0.000000001,
@@ -404,7 +395,11 @@ def score_VAE_attack(model_num, losses_synth, losses_aux):
     for name, pred in [("MSE", prediction_mse), ("CE", prediction_ce), ("MSE+CE", ens_prediction), ("KL", prediction_kl)]:  # , prediction_acc]:
         fpr, tpr, thresholds = roc_curve(membership, pred)
         tpr_at_desired_fpr = np.interp(desired_fpr, fpr, tpr)
-        print(name, tpr_at_desired_fpr, roc_auc_score(membership, pred))
+        auc = roc_auc_score(membership, pred)
+        print(name, tpr_at_desired_fpr, auc)
+    scores = (prediction_mse, prediction_ce, ens_prediction, prediction_kl)
+
+    return scores, tpr_at_desired_fpr, auc
 
 def encode_and_attack_challenge_points(tabsyn_model, X_train_num_c, X_train_cat_c):
     z_c = tabsyn_model.pre_encoder(X_train_num_c, X_train_cat_c)
