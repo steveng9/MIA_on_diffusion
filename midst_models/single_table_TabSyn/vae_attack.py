@@ -459,8 +459,8 @@ def score_diffusion_attack(model_num, losses_s, losses_a, predictions_s, predict
         zeta_loss = losses_s[t] / losses_a[t]
         zeta_predictions = predictions_s[t] / predictions_a[t]
 
-        activated_zeta_loss = activate_3(np.array(zeta_loss))
-        activated_zeta_predictions = activate_3(np.array(zeta_predictions))
+        activated_zeta_loss = (1 - activate_3(np.array(zeta_loss)))
+        activated_zeta_predictions = (1 - activate_3(np.array(zeta_predictions)))
 
         tpr_l, auc_l = get_tpr_at_fpr(membership, activated_zeta_loss)
         tpr_p, auc_p = get_tpr_at_fpr(membership, activated_zeta_predictions)
