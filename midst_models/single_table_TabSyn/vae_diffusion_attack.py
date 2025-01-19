@@ -29,12 +29,8 @@ warnings.filterwarnings("ignore")
 verbose = False
 
 
-# # python vae_attack.py train_synth 1 1000 dont_save
-# train_aux = sys.argv[1] == "train_aux"
-# train_new_synth = sys.argv[1] == "train_synth"
-# model_num = int(sys.argv[2])
-# num_epochs = int(sys.argv[3])
-# save_results = sys.argv[4] == "save"
+
+# python vae_diffusion_attack.py action=synth_diff model=1 SV=4000 SD=10000 save_score=false
 
 acceptable_args = {
     "action": str,
