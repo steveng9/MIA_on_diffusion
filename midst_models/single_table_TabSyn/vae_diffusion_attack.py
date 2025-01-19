@@ -320,7 +320,9 @@ def attack_diffusion(args):
 
 
 
-
+################################################################
+##########         HELPER FUNCTIONS          ###################
+################################################################
 
 
 def preprocess_for_attack(raw_config, device, data_dir, data_dir_all):
