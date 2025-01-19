@@ -303,6 +303,7 @@ class TabSyn:
 
             print("Successfully saved pretrained embeddings on disk!")
 
+
     def load_latent_embeddings(self, vae_ckpt_dir):
         embedding_save_path = os.path.join(vae_ckpt_dir, "train_z.npy")
         train_z = torch.tensor(np.load(embedding_save_path)).float()
@@ -369,11 +370,17 @@ class TabSyn:
 
     def attack_diffusion(self, latent_challenge_points):
 
-        mean = -1.2
         # std_dev should really be 1.2 to match EDMLoss implementation, but 1.7 assures that
         # we cover a wider range of t's that were likely seen in training.
-        std_dev = 1.8
+
+        # mean = -1.2
+        # std_dev = 1.8
+        # num_points = 30
+
+        mean = -4
+        std_dev = .75
         num_points = 30
+
         # Generate evenly spaced probabilities
         probabilities = np.linspace(0, 1, num_points, endpoint=False)[1:]  # Avoid 0 and 1
         sigmas = norm.ppf(probabilities, loc=mean, scale=std_dev)
@@ -385,10 +392,17 @@ class TabSyn:
 
         with torch.no_grad():
             for t in T_set:
-                inputs = latent_challenge_points.float().to(self.device)
+                if torch.cuda.is_available():
+                    inputs = latent_challenge_points.float().to(self.device)
+                else:
+                    inputs = latent_challenge_points.float().to(torch.device("cpu"))
                 loss, predicted_noise = self.dif_model.attack(inputs, t)
                 challenge_loss.append(loss.mean(1).cpu().numpy())
                 challenge_noise.append(predicted_noise.mean(1).cpu().numpy())
+                # challenge_loss.append(loss.sum(1).cpu().numpy())
+                # challenge_noise.append(predicted_noise.sum(1).cpu().numpy())
+                # challenge_loss.append(loss.cpu().numpy())
+                # challenge_noise.append(predicted_noise.cpu().numpy())
 
         return challenge_loss, challenge_noise
 

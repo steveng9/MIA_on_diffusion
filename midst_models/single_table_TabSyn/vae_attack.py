@@ -231,7 +231,7 @@ def attack_diffusion(args):
     num_epochs_SV = args.SV
     num_epochs_AD = args.AD
     num_epochs_SD = args.SD
-    print(f"\nAttacking Denoiser, epochs: {num_epochs_AV}, {num_epochs_SV}, {num_epochs_AD}, {num_epochs_SD}\n\n")
+    print(f"\nAttacking Denoiser, Model {model_num}, epochs: {num_epochs_AV}, {num_epochs_SV}, {num_epochs_AD}, {num_epochs_SD}\n\n")
 
     threat_model = "black_box"
     ATTACK_ARTIFACTS = "attack_artifacts/"
@@ -451,6 +451,8 @@ def score_diffusion_attack(model_num, losses_s, losses_a, predictions_s, predict
     membership = pd.read_csv(f"../../data/tabsyn_{threat_model}/train/tabsyn_{model_num}/challenge_label.csv", header="infer")
     membership = membership['is_train'].tolist()
 
+    all_zeta_loss = []
+    all_zeta_predictions = []
     tpr_ls = []
     auc_ls = []
     tpr_ps = []
@@ -459,18 +461,27 @@ def score_diffusion_attack(model_num, losses_s, losses_a, predictions_s, predict
         zeta_loss = losses_s[t] / losses_a[t]
         zeta_predictions = predictions_s[t] / predictions_a[t]
 
+        # activated_zeta_loss = (1 - activate_3(np.array(zeta_loss.mean(1))))
+        # activated_zeta_predictions = (1 - activate_3(np.array(zeta_predictions.mean(1))))
         activated_zeta_loss = (1 - activate_3(np.array(zeta_loss)))
         activated_zeta_predictions = (1 - activate_3(np.array(zeta_predictions)))
 
         tpr_l, auc_l = get_tpr_at_fpr(membership, activated_zeta_loss)
         tpr_p, auc_p = get_tpr_at_fpr(membership, activated_zeta_predictions)
         print(f"{t+1}: \t{tpr_l:.4f}\t{auc_l:.4f}\t\t{tpr_p:.4f}\t{auc_p:.4f}")
+        all_zeta_loss.append(activated_zeta_loss)
+        all_zeta_predictions.append(activated_zeta_predictions)
         tpr_ls.append(tpr_l)
         auc_ls.append(auc_l)
         tpr_ps.append(tpr_p)
         auc_ps.append(auc_p)
 
-    print(f"\n{mean(tpr_ls)}\t{mean(auc_ls)}\t{mean(tpr_ps)}\t{mean(auc_ps)}")
+    tpr_allT_l, auc_allT_l = get_tpr_at_fpr(membership, np.array(all_zeta_loss).mean(0))
+    tpr_allT_p, auc_allT_p = get_tpr_at_fpr(membership, np.array(all_zeta_predictions).mean(0))
+
+    print()
+    print(f"{tpr_allT_l}\t{auc_allT_l}\t{tpr_allT_p}\t{auc_allT_p}")
+    print(f"{mean(tpr_ls)}\t{mean(auc_ls)}\t{mean(tpr_ps)}\t{mean(auc_ps)}")
 
 
 def get_tpr_at_fpr(y_true, y_pred):

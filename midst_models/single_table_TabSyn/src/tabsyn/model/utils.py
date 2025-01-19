@@ -218,9 +218,11 @@ class AttackEDMLoss:
         D_yn = denoise_fn(y + noise, t_tensor)
         target = y
         loss = weight.unsqueeze(1) * ((D_yn - target) ** 2)
+        # loss = (D_yn - target) ** 2
 
         # TODO: square this value to be non-negative?
         predicted_noise = np.abs((y - denoise_fn(y, t_tensor)).cpu())
+        # predicted_noise = (y - denoise_fn(y, t_tensor)).cpu() ** 2
 
         # TODO add PIAn equation
 
