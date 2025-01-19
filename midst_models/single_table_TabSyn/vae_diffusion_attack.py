@@ -35,6 +35,7 @@ verbose = False
 acceptable_args = {
     "action": str,
     "model": int,
+    "all_models": str,
     "save_score": bool,
     "AV": int,  # Number of VAE epochs on auxiliary data
     "SV": int,  # Number of VAE epochs on synthetic data
@@ -70,6 +71,7 @@ def main():
     elif args.action == 'aux_diff': train_aux_diffusion(args)
     elif args.action == 'synth_diff': train_synth_diffusion(args)
     elif args.action == 'attack_diff': attack_diffusion(args)
+    elif args.action == 'train_several': train_several(args)
     else: raise ValueError(f"Invalid action: {args.action}")
 
 
@@ -316,6 +318,16 @@ def attack_diffusion(args):
     df = pd.read_csv(os.path.join(SYNTH_DATA_DIR, DATA_NAME, "tabsyn.csv"))
     df.head(10)
     '''
+
+
+def train_several(args):
+    model_nums = args.all_models.split(":")
+    model_start, model_end = int(model_nums[0]), int(model_nums[1])
+
+    for model in range(model_start, model_end+1):
+        args.model = model
+        train_synth_vae(args)
+        train_synth_diffusion(args)
 
 
 
