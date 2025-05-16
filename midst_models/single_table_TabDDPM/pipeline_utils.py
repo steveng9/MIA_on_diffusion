@@ -353,8 +353,9 @@ def pipeline_process_data(name, data_df, info, ratio=0.9, save=False, verbose=Tr
     return data, info
 
 
-def load_multi_table(data_dir, verbose=True):
-    dataset_meta = json.load(open(os.path.join(data_dir, "dataset_meta.json"), "r"))
+def load_multi_table(data_dir, verbose=True, metadata_dir=None, dataset_name=None):
+    if metadata_dir is None: metadata_dir = data_dir
+    dataset_meta = json.load(open(os.path.join(metadata_dir, "dataset_meta.json"), "r"))
 
     relation_order = dataset_meta["relation_order"]
     relation_order_reversed = relation_order[::-1]
@@ -365,10 +366,11 @@ def load_multi_table(data_dir, verbose=True):
         if os.path.exists(os.path.join(data_dir, "train.csv")):
             train_df = pd.read_csv(os.path.join(data_dir, "train.csv"))
         else:
-            train_df = pd.read_csv(os.path.join(data_dir, f"{table}.csv"))
+
+            train_df = pd.read_csv(os.path.join(data_dir, f"{dataset_name or table}.csv"))
         tables[table] = {
             "df": train_df,
-            "domain": json.load(open(os.path.join(data_dir, f"{table}_domain.json"))),
+            "domain": json.load(open(os.path.join(metadata_dir, f"{table}_domain.json"))),
             "children": meta["children"],
             "parents": meta["parents"],
         }
@@ -438,16 +440,125 @@ def sample_from_diffusion(
     K = np.array(dataset.get_category_sizes("train"))
     if len(K) == 0 or T_dict["cat_encoding"] == "one-hot":
         K = np.array([0])
-    # print(K)
 
     d_in = np.sum(K) + num_numerical_features
     model_params["d_in"] = d_in
-    # print(d_in)
     _, empirical_class_dist = torch.unique(
         torch.from_numpy(dataset.y["train"]), return_counts=True
     )
     x_gen, y_gen = diffusion.sample_all(
         sample_size, sample_batch_size, empirical_class_dist.float(), ddim=False
+    )
+    X_gen, y_gen = x_gen.numpy(), y_gen.numpy()
+    num_numerical_features_sample = num_numerical_features + int(
+        dataset.is_regression and not model_params["is_y_cond"]
+    )
+
+    X_num_real = df[df_info["num_cols"]].to_numpy().astype(float)
+    X_cat_real = df[df_info["cat_cols"]].to_numpy().astype(str)
+    y_real = (
+        np.round(df[df_info["y_col"]].to_numpy().astype(float))
+        .astype(int)
+        .reshape(-1, 1)
+    )
+
+    X_num_ = X_gen
+
+    if num_numerical_features != 0:
+        X_num_ = dataset.num_transform.inverse_transform(
+            X_gen[:, :num_numerical_features_sample]
+        )
+        actual_num_numerical_features = num_numerical_features - len(label_encoders)
+        X_num = X_num_[:, :actual_num_numerical_features]
+        if len(label_encoders) > 0:
+            X_cat = X_num_[:, actual_num_numerical_features:]
+            X_cat = np.round(X_cat).astype(int)
+            decoded_x_cat = []
+            for col in range(X_cat.shape[1]):
+                x_cat_col = X_cat[:, col]
+                x_cat_col = np.clip(x_cat_col, 0, len(label_encoders[col].classes_) - 1)
+                decoded_x_cat.append(label_encoders[col].inverse_transform(x_cat_col))
+            X_cat = np.column_stack(decoded_x_cat)
+        else:
+            X_cat = np.empty((X_num.shape[0], 0))
+
+        disc_cols = []
+        for col in range(X_num_real.shape[1]):
+            uniq_vals = np.unique(X_num_real[:, col])
+            if len(uniq_vals) <= 32 and ((uniq_vals - np.round(uniq_vals)) == 0).all():
+                disc_cols.append(col)
+        # print("Discrete cols:", disc_cols)
+        if model_params["is_y_cond"] == "concat":
+            y_gen = X_num[:, 0]
+            X_num = X_num[:, 1:]
+        if len(disc_cols):
+            X_num = round_columns(X_num_real, X_num, disc_cols)
+
+    y_gen = y_gen.reshape(-1, 1)
+
+    if X_cat_real is not None:
+        total_real = np.concatenate((X_num_real, X_cat_real, y_real), axis=1)
+        gen_real = np.concatenate((X_num, X_cat, np.round(y_gen).astype(int)), axis=1)
+    else:
+        total_real = np.concatenate((X_num_real, y_real), axis=1)
+        gen_real = np.concatenate((X_num, np.round(y_gen).astype(int)), axis=1)
+
+    df_total = pd.DataFrame(total_real)
+    df_gen = pd.DataFrame(gen_real)
+    columns = [str(x) for x in list(df_total.columns)]
+
+    df_total.columns = columns
+    df_gen.columns = columns
+
+    for col in df_total.columns:
+        if int(col) < X_num_real.shape[1]:
+            df_total[col] = df_total[col].astype(float)
+            df_gen[col] = df_gen[col].astype(float)
+        elif (
+            X_cat_real is not None
+            and int(col) < X_num_real.shape[1] + X_cat_real.shape[1]
+        ):
+            df_total[col] = df_total[col].astype(str)
+            df_gen[col] = df_gen[col].astype(str)
+        else:
+            df_total[col] = df_total[col].astype(float)
+            df_gen[col] = df_gen[col].astype(float)
+
+    return df_total, df_gen
+
+
+
+def reconstruct_from_diffusion(
+    df,
+    df_info,
+    diffusion,
+    dataset,
+    label_encoders,
+    sample_size,
+    model_params,
+    T_dict,
+    partial_table,
+    known_features_mask,
+    sample_batch_size=8192,
+):
+
+    # TODO: make sure this transformation correctly matches how z_norm will look
+    partial_table_encoded = torch.from_numpy(dataset.num_transform.transform(partial_table))
+    num_numerical_features = (
+        dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
+    )
+
+    K = np.array(dataset.get_category_sizes("train"))
+    if len(K) == 0 or T_dict["cat_encoding"] == "one-hot":
+        K = np.array([0])
+
+    d_in = np.sum(K) + num_numerical_features
+    model_params["d_in"] = d_in
+    _, empirical_class_dist = torch.unique(
+        torch.from_numpy(dataset.y["train"]), return_counts=True
+    )
+    x_gen, y_gen = diffusion.reconstruct_all(
+        sample_batch_size, empirical_class_dist.float(), known_features_mask, partial_table_encoded, ddim=False
     )
     X_gen, y_gen = x_gen.numpy(), y_gen.numpy()
     num_numerical_features_sample = num_numerical_features + int(
@@ -574,6 +685,7 @@ def train_model(
 
     print("Model params: {}".format(model_params))
     model = get_model(model_type, model_params)
+
     model.to(device)
 
     train_loader = prepare_fast_dataloader(

@@ -360,7 +360,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
             extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t - pred_xstart
         ) / extract(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
 
-    def condition_mean(self, cond_fn, p_mean_var, x, t, model_kwargs=None):
+    def condition_mean(self, cond_fn, p_mean_var, x, t, model_kwargs={}):
         """
         Compute the mean for the previous step, given a function cond_fn that
         computes the gradient of a conditional log probability with respect to
@@ -425,6 +425,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                 cond_fn, out, x, t, model_kwargs=model_kwargs
             )
 
+        # TODO: maybe to make stronger conditioning, I can make the variance 0 for those conditioned on known values.
         sample = (
             out["mean"] + nonzero_mask * torch.exp(0.5 * out["log_variance"]) * noise
         )
@@ -1088,6 +1089,61 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         sample = torch.cat([z_norm, z_cat], dim=1).cpu()
         return sample, out_dict
 
+    @torch.no_grad()
+    def reconstruct(self, b, y_dist,
+        known_features_mask,
+        known_features_values,
+        model_kwargs=None, cond_fn=None
+    ):
+        device = self.log_alpha.device
+        z_norm = torch.randn((b, self.num_numerical_features), device=device)
+
+        has_cat = self.num_classes[0] != 0
+        log_z = torch.zeros((b, 0), device=device).float()
+        # if has_cat:
+        #     uniform_logits = torch.zeros(
+        #         (b, len(self.num_classes_expanded)), device=device
+        #     )
+        #     log_z = self.log_sample_categorical(uniform_logits)
+
+        y = torch.multinomial(y_dist, num_samples=b, replacement=True)
+        out_dict = {"y": y.long().to(device)}
+        for i in reversed(range(0, self.num_timesteps)):
+            print(f"Sample timestep {i:4d}", end="\r")
+            t = torch.full((b,), i, device=device, dtype=torch.long)
+
+            # here's our novelty: replace z_norm features with known features.
+            # Then, possibly, make t=0 for those features?
+            z_norm_modified = z_norm * (1 - known_features_mask) + known_features_values * known_features_mask
+            # t_modified = t * (1 - known_features_mask)
+
+            model_out = self._denoise_fn(
+                torch.cat([z_norm_modified, log_z], dim=1).float(), t, **out_dict
+            )
+            model_out_num = model_out[:, : self.num_numerical_features]
+            model_out_cat = model_out[:, self.num_numerical_features :]
+
+            # TODO: do I send in the partially-modified z_norm here too?
+            z_norm = self.gaussian_p_sample(
+                model_out_num,
+                z_norm_modified,
+                t,
+                clip_denoised=False,
+                model_kwargs=model_kwargs,
+                cond_fn=cond_fn,
+            )["sample"]
+            if has_cat:
+                log_z = self.p_sample(model_out_cat, log_z, t, out_dict)
+
+        print()
+        z_ohe = torch.exp(log_z).round()
+        z_cat = log_z
+        if has_cat:
+            z_cat = ohe_to_categories(z_ohe, self.num_classes)
+        reconstruction = torch.cat([z_norm, z_cat], dim=1).cpu()
+        return reconstruction, out_dict
+
+
     def sample_all(
         self,
         num_samples,
@@ -1126,3 +1182,159 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         y_gen = torch.cat(all_y, dim=0)[:num_samples]
 
         return x_gen, y_gen
+
+
+    def reconstruct_all(
+        self,
+        batch_size,
+        y_dist,
+        known_features_mask,
+        known_features_values,
+        ddim=False,
+        model_kwargs=None,
+        cond_fn=None,
+    ):
+        b = batch_size
+        N = len(known_features_values)
+
+        all_y = []
+        full_reconstruction = []
+        i = 0
+        while i < N:
+            b_ = min(b, N-i)
+            reconstruction, out_dict = self.reconstruct(
+                b_, y_dist,
+                known_features_mask[i:i+b_],
+                known_features_values[i:i+b_],
+                model_kwargs=model_kwargs, cond_fn=cond_fn
+            )
+            mask_nan = torch.any(reconstruction.isnan(), dim=1)
+            # reconstruction = reconstruction[~mask_nan]
+            # out_dict["y"] = out_dict["y"][~mask_nan]
+
+            full_reconstruction.append(reconstruction)
+            all_y.append(out_dict["y"].cpu())
+            if mask_nan.sum() > 0:
+                raise FoundNANsError
+            i += reconstruction.shape[0]
+
+        x_gen = torch.cat(full_reconstruction, dim=0)
+        y_gen = torch.cat(all_y, dim=0)
+
+        return x_gen, y_gen
+
+    #
+    # @torch.no_grad()
+    # def conditional_sample_with_known_features(self, y_dist, known_features_mask, known_features_values,
+    #                                            scale=10.0):
+    #     """
+    #     Generate samples with specific feature values fixed.
+    #
+    #     Args:
+    #         num_samples: Number of samples to generate
+    #         y_dist: Distribution of class labels (if applicable)
+    #         known_features_mask: Binary mask (1=known, 0=unknown) [num_samples, num_features]
+    #         known_features_values: Values of known features [num_samples, num_features]
+    #         scale: Conditioning strength
+    #     """
+    #     b = len(known_features_mask)
+    #     device = self.log_alpha.device
+    #
+    #     # Initialize with random noise
+    #     z_norm = torch.randn((b, self.num_numerical_features), device=device)
+    #
+    #     # Set up categorical features if present
+    #     has_cat = self.num_classes[0] != 0
+    #     log_z = torch.zeros((b, 0), device=device).float()
+    #     # if has_cat:
+    #     #     uniform_logits = torch.zeros((b, len(self.num_classes_expanded)), device=device)
+    #     #     log_z = self.log_sample_categorical(uniform_logits)
+    #
+    #     # Create label conditioning
+    #     y = torch.multinomial(y_dist, num_samples=b, replacement=True)
+    #     out_dict = {"y": y.long().to(device)}
+    #
+    #     # Split masks for numerical and categorical features
+    #     num_mask = known_features_mask[:, :self.num_numerical_features]
+    #     num_values = known_features_values[:, :self.num_numerical_features]
+    #
+    #     # # Handle categorical masks (more complex due to one-hot encoding)
+    #     # cat_mask = None
+    #     # cat_values = None
+    #     # if has_cat:
+    #     #     cat_mask = known_features_mask[:, self.num_numerical_features:]
+    #     #     cat_values = known_features_values[:, self.num_numerical_features:]
+    #
+    #     # Define conditioning function - we'll only apply it to numerical features for simplicity
+    #     def cond_fn(x, t_):
+    #         return self.partial_features_cond_fn(x, t_, num_mask, num_values, scale)
+    #
+    #     # Sampling loop
+    #     for i in reversed(range(0, self.num_timesteps)):
+    #         print(f"Sample timestep {i:4d}", end="\r")
+    #         t = torch.full((b,), i, device=device, dtype=torch.long)
+    #
+    #         # Get model prediction
+    #         model_out = self._denoise_fn(torch.cat([z_norm, log_z], dim=1).float(), t, **out_dict)
+    #         model_out_num = model_out[:, :self.num_numerical_features]
+    #         model_out_cat = model_out[:, self.num_numerical_features:]
+    #
+    #         # TODO: try making the known values of z_norm the true values. Could that make even stronger conditioning?
+    #         # Apply denoising step with conditioning
+    #         z_norm = self.gaussian_p_sample(
+    #             model_out_num,
+    #             z_norm,
+    #             t,
+    #             clip_denoised=False,
+    #             cond_fn=cond_fn,
+    #             model_kwargs={},
+    #         )["sample"]
+    #
+    #         # # Process categorical features if present
+    #         # if has_cat:
+    #         #     log_z = self.p_sample(model_out_cat, log_z, t, out_dict)
+    #
+    #         # For numerical features that are known, directly enforce the noisy values
+    #         # This ensures stronger conditioning than just the gradient
+    #         if i > 0:  # Skip last step to get clean output
+    #             # Add appropriately scaled noise to known features at this timestep
+    #             noise_level = extract(self.sqrt_one_minus_alphas_cumprod, t, z_norm.shape)
+    #             alpha_level = extract(self.sqrt_alphas_cumprod, t, z_norm.shape)
+    #
+    #             # Create noisy version of ground truth
+    #             noisy_target = num_values * alpha_level + torch.randn_like(num_values) * noise_level
+    #
+    #             # Apply mask to replace only known features
+    #             z_norm = torch.where(num_mask.bool(), noisy_target, z_norm)
+    #
+    #     print()
+    #     # # Process final output
+    #     # z_ohe = torch.exp(log_z).round() if has_cat else log_z
+    #     # z_cat = ohe_to_categories(z_ohe, self.num_classes) if has_cat else log_z
+    #     sample = torch.cat([z_norm], dim=1).cpu()
+    #
+    #     return sample, out_dict
+    #
+    # def partial_features_cond_fn(self, x, t, known_features_mask, known_features_values, scale=1.0):
+    #     """
+    #     Conditioning function that guides the diffusion model to respect known feature values.
+    #
+    #     Args:
+    #         x: Current tensor being denoised
+    #         t: Current timestep
+    #         known_features_mask: Binary mask indicating which features are known (1) vs unknown (0)
+    #         known_features_values: Values of the known features (same shape as x)
+    #         scale: Strength of the conditioning (higher = stronger conditioning)
+    #
+    #     Returns:
+    #         Gradient to guide the denoising process
+    #     """
+    #     # Calculate noisy version of known features at current timestep
+    #     with torch.enable_grad():
+    #         x_in = x.detach().requires_grad_(True)
+    #         # Compute the mean squared error between the denoised known features and true known features
+    #         noise_level = extract(self.sqrt_one_minus_alphas_cumprod, t, x.shape)
+    #         target_noisy = known_features_values * extract(self.sqrt_alphas_cumprod, t, x.shape) + torch.randn_like(known_features_values) * noise_level
+    #         error = ((x_in - target_noisy) * known_features_mask) ** 2
+    #         grad = torch.autograd.grad(error.sum(), x_in)[0]
+    #         return -scale * grad

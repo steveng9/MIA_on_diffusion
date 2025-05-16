@@ -107,6 +107,7 @@ def child_training(
         configs["diffusion"]["scheduler"],
         configs["diffusion"]["lr"],
         configs["diffusion"]["weight_decay"],
+        device="cuda" if torch.cuda.is_available() else "cpu",
     )
 
     if parent_name is None:

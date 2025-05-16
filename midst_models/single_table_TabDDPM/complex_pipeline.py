@@ -19,7 +19,7 @@ def clava_clustering(tables, relation_order, save_dir, configs):
     all_group_lengths_prob_dicts = {}
 
     # Clustering
-    if os.path.exists(os.path.join(save_dir, "cluster_ckpt.pkl")):
+    if os.path.exists(os.path.join(save_dir, "cluster_ckpt.pkl")) and False:
         print("Clustering checkpoint found, loading...")
         cluster_ckpt = pickle.load(
             open(os.path.join(save_dir, "cluster_ckpt.pkl"), "rb")
@@ -89,6 +89,9 @@ def clava_training(tables, relation_order, save_dir, configs):
 
     return models
 
+# def tabddpm_attack(model, tables, configs):
+
+
 class CustomUnpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module.startswith("midst_competition.single_table_ClavaDDPM"):
@@ -128,7 +131,9 @@ def clava_synthesizing(
         df_with_cluster = tables[child]["df"]
         df_without_id = get_df_without_id(df_with_cluster)
 
-        print("Sample size: {}".format(int(sample_scale * len(df_without_id))))
+        # sample_size = int(sample_scale * len(df_without_id))
+        sample_size = 100
+        print("Sample size: {}".format(sample_size))
 
         if parent is None:
             _, child_generated = sample_from_diffusion(
@@ -137,7 +142,8 @@ def clava_synthesizing(
                 diffusion=result["diffusion"],
                 dataset=result["dataset"],
                 label_encoders=result["label_encoders"],
-                sample_size=int(sample_scale * len(df_without_id)),
+                # sample_size=int(sample_scale * len(df_without_id)),
+                sample_size=sample_size,
                 model_params=result["model_params"],
                 T_dict=result["T_dict"],
                 sample_batch_size=configs["sampling"]["batch_size"],
@@ -295,6 +301,104 @@ def clava_synthesizing(
     return cleaned_tables, synthesizing_time_spent, matching_time_spent
 
 
+
+def clava_reconstructing(
+    tables,
+    relation_order,
+    save_dir,
+    all_group_lengths_prob_dicts,
+    models,
+    configs,
+    partial_table,
+    known_features_mask,
+    sample_scale=1,
+):
+    synthetic_tables = {}
+
+    # Synthesize
+    _parent, child = relation_order[0]
+    assert _parent is None
+    result = models[(_parent, child)]
+    df_with_cluster = tables[child]["df"]
+    df_without_id = get_df_without_id(df_with_cluster)
+    sample_size = len(partial_table)
+    # sample_size = 100
+
+    _, child_generated = reconstruct_from_diffusion(
+        df=df_without_id,
+        df_info=result["df_info"],
+        diffusion=result["diffusion"],
+        dataset=result["dataset"],
+        label_encoders=result["label_encoders"],
+        # sample_size=int(sample_scale * len(df_without_id)),
+        sample_size=sample_size,
+        model_params=result["model_params"],
+        T_dict=result["T_dict"],
+        partial_table=partial_table,
+        known_features_mask=known_features_mask,
+        sample_batch_size=configs["sampling"]["batch_size"],
+    )
+    child_keys = list(range(len(child_generated)))
+    generated_final_arr = np.concatenate(
+        [np.array(child_keys).reshape(-1, 1), child_generated.to_numpy()],
+        axis=1,
+    )
+    generated_final_df = pd.DataFrame(
+        generated_final_arr,
+        columns=[f"{child}_id"]
+        + result["df_info"]["num_cols"]
+        + result["df_info"]["cat_cols"]
+        + [result["df_info"]["y_col"]],
+    )
+    # generated_final_df = generated_final_df[tables[child]['df'].columns]
+    generated_final_df = generated_final_df[
+        [f"{child}_id"] + df_without_id.columns.tolist()
+    ]
+    synthetic_tables[(_parent, child)] = {
+        "df": generated_final_df,
+        "keys": child_keys,
+    }
+    pickle.dump(
+        synthetic_tables,
+        open(os.path.join(save_dir, "before_matching/synthetic_tables.pkl"), "wb"),
+    )
+
+    # Matching
+    final_tables = {}
+    final_tables[child] = synthetic_tables[(_parent, child)]["df"]
+
+    cleaned_tables = {}
+    for key, val in final_tables.items():
+        if "account_id" in tables[key]["original_cols"]:
+            cols = tables[key]["original_cols"]
+            cols.remove("account_id")
+        else:
+            cols = tables[key]["original_cols"]
+        cleaned_tables[key] = val[cols]
+
+    for key, val in cleaned_tables.items():
+        table_dir = os.path.join(
+            configs["general"]["workspace_dir"],
+            configs["general"]["exp_name"],
+            key,
+            f'{configs["general"]["sample_prefix"]}_final',
+        )
+        os.makedirs(table_dir, exist_ok=True)
+        if f"{key}_id" in val.columns:
+            val.to_csv(
+                os.path.join(table_dir, f"{key}_synthetic_with_id.csv"), index=False
+            )
+            val_no_id = val.drop(columns=[f"{key}_id"])
+            val_no_id.to_csv(
+                os.path.join(table_dir, f"{key}_synthetic.csv"), index=False
+            )
+        else:
+            val.to_csv(os.path.join(table_dir, f"{key}_synthetic.csv"), index=False)
+    return cleaned_tables
+
+
+
+
 def clava_load_synthesized_data(table_keys, table_dir):
     all_exist = True
     for key in table_keys:
@@ -386,12 +490,14 @@ def clava_eval(tables, save_dir, configs, relation_order, synthetic_tables=None)
     return report
 
 
-def load_configs(config_path):
+def load_configs(config_path, save_dir=None):
+
     configs = json.load(open(config_path, "r"))
 
-    save_dir = os.path.join(
-        configs["general"]["workspace_dir"], configs["general"]["exp_name"]
-    )
+    if save_dir is None:
+        save_dir = os.path.join(
+            configs["general"]["workspace_dir"], configs["general"]["exp_name"]
+        )
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.join(save_dir, "models"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "before_matching"), exist_ok=True)
