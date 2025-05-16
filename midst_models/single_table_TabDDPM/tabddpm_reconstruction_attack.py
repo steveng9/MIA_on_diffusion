@@ -1,4 +1,4 @@
-ON_UW_SERVER = False
+ON_UW_SERVER = True
 
 import sys
 import os
@@ -6,7 +6,6 @@ import json
 import pandas as pd
 import numpy as np
 import pickle
-
 from numpy import mean
 from scipy import stats
 from argparse import Namespace
@@ -21,7 +20,6 @@ from sklearn.metrics import roc_curve, roc_auc_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 
-
 import category_encoders
 from complex_pipeline import (
     clava_clustering,
@@ -30,22 +28,21 @@ from complex_pipeline import (
     clava_synthesizing,
     load_configs, clava_reconstructing,
 )
-from midst_models.single_table_TabDDPM.configs_nist_crc.generate_config_files import data_path
 from pipeline_modules import load_multi_table
-
-
-
 import warnings
 warnings.filterwarnings("ignore")
 
 
-
-
 verbose = False
+data_path = "/home/golobs/data/" if ON_UW_SERVER \
+    else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
+DATA_NAME = "7_MST_e10_25f_QID1"
+# DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
+QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
+num_epochs = 200_000
+num_epochs_classifier = 20_000
 
 
-
-# python vae_diffusion_attack.py action=synth_diff model=1 SV=4000 SD=10000 save_score=false
 
 acceptable_args = {
     "action": str,
@@ -72,7 +69,7 @@ def parse_args():
 
 
 def main():
-    if torch.cuda.is_available():print("Using CUDA device!")
+    if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
 
     train_diffusion()
@@ -85,26 +82,23 @@ def main():
 
 
 def train_diffusion():
-    num_epochs = 200_000
     print(f"\nTraining TabDDPM with {num_epochs} epochs\n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
-    DATA_DIR = "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
-    # dataset_name = "19_CELL_SUPPRESSION_25f_QID1_Deid"
-    dataset_name = "7_MST_e10_25f_QID1_Deid"
+    DATA_DIR = data_path
+    dataset_name = DATA_NAME + "_Deid"
 
     config_path = "configs_nist_crc/crc_data.json"
     configs, _ = load_configs(config_path, MODEL_PATH)
 
-    # configs["diffusion"]["iterations"] = num_epochs
-    # configs["classifier"]["iterations"] = 20_000
+    configs["diffusion"]["iterations"] = num_epochs
+    configs["classifier"]["iterations"] = num_epochs_classifier
 
     tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
 
     models = clava_training(tables, relation_order, MODEL_PATH, configs)
     # models, tables, all_group_lengths_prob_dicts, dataset_meta, relation_order, configs = train_diffusion_for_attack(num_epochs, MODEL_PATH, DATA_DIR, dataset_name)
-
 
     os.makedirs(MODEL_PATH + f"/e{num_epochs}", exist_ok=True)
     dump_artifact(models, MODEL_PATH + f"/model")
@@ -115,29 +109,13 @@ def train_diffusion():
     dump_artifact(configs, MODEL_PATH + f"/configs")
 
 
-#
-# def train_diffusion_for_attack(num_epochs, model_path, data_dir, dataset_name):
-#     config_path = "configs_nist_crc/crc_data.json"
-#     configs, _ = load_configs(config_path, model_path)
-#
-#     configs["diffusion"]["iterations"] = num_epochs
-#     configs["classifier"]["iterations"] = num_epochs
-#
-#     tables, relation_order, dataset_meta = load_multi_table(data_dir, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
-#     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, model_path, configs)
-#
-#     models = clava_training(tables, relation_order, model_path, configs)
-#     return models, tables, all_group_lengths_prob_dicts, dataset_meta, relation_order, configs
-
 def reconstruct_data():
-    num_epochs = 3
-    qi = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
+    num_epochs = 200_000
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models"
-    # dataset_name = "19_CELL_SUPPRESSION_25f_QID1_AttackTargets"
-    targets_name = "7_MST_e10_25f_QID1_AttackTargets"
+    targets_name = DATA_NAME + "_AttackTargets"
     targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[qi]
+    partial_data = targets[QI]
 
     models = load_artifact(MODEL_PATH + f"/e{num_epochs}/model")
     tables = load_artifact(MODEL_PATH + f"/e{num_epochs}/tables")
@@ -151,7 +129,7 @@ def reconstruct_data():
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     partial_data = partial_data[column_order]
     known_features_mask = torch.zeros((len(partial_data), 25))
-    known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
+    known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
 
     cleaned_tables = clava_reconstructing(
         tables,
