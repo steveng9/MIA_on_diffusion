@@ -1,4 +1,4 @@
-ON_UW_SERVER = True
+ON_UW_SERVER = False
 
 import sys
 import os
@@ -12,6 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 import torch.profiler
 
+sys.path.append("../../")
 import category_encoders
 from complex_pipeline import (
     clava_clustering,
@@ -28,10 +29,13 @@ warnings.filterwarnings("ignore")
 verbose = False
 data_path = "/home/golobs/data/" if ON_UW_SERVER \
     else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
-DATA_NAME = "7_MST_e10_25f_QID1"
+DATA_NAME = "25_Demo_MST_e10_25f"
+# DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
-num_epochs = 200_000
+HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
+features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
+num_epochs = 3
 num_epochs_classifier = 20_000
 
 
@@ -64,9 +68,9 @@ def main():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
 
-    train_diffusion()
+    # train_diffusion()
     # gen_synth_data()
-    # reconstruct_data()
+    reconstruct_data()
 
 
 
@@ -102,10 +106,9 @@ def train_diffusion():
 
 
 def reconstruct_data():
-    num_epochs = 200_000
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models"
-    targets_name = DATA_NAME + "_AttackTargets"
+    targets_name = DATA_NAME + "_AttackTargets" if "25_" not in DATA_NAME else "25_Demo_25f_OriginalData"
     targets = pd.read_csv(data_path + targets_name + ".csv")
     partial_data = targets[QI]
 
@@ -143,6 +146,23 @@ def reconstruct_data():
                     cleaned_tables[key][col] = cleaned_tables[key][col].astype(int)
                 except ValueError:
                     print(f"Column {col} cannot be converted to int.")
+
+    reconstructed = cleaned_tables['crc_data']
+
+    reconstruction_scores = pd.DataFrame(index=features_25)
+    reconstruction_scores.loc[HIDDEN, "tabddpm_recon"] = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
+
+    # Set display width very large to avoid wrapping and truncating
+    pd.set_option('display.width', 1000)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+
+    for l in reconstruction_scores.loc[sorted(HIDDEN)].T.to_numpy()[2:]:
+        for x in l:
+            print(x, end=",")
+        print()
+    print("ave: ", round(reconstruction_scores.loc[sorted(HIDDEN)].T.iloc[2:].mean().mean(), 2))
+
 
 
 
@@ -207,6 +227,19 @@ def load_artifact(name):
     pickle_file.close()
     return artifact
 
+
+def calculate_reconstruction_score(df_original, df_reconstructed, hidden_features):
+    total_records = len(df_original)
+
+    scores = []
+    for col in hidden_features:
+        value_counts = df_original[col].value_counts()
+        rarity_scores = df_original[col].map(total_records / value_counts)
+        max_score = rarity_scores.sum()
+
+        score = ( (df_original[col].values == df_reconstructed[col].values) * rarity_scores ).sum()
+        scores.append(round(score / max_score * 100, 1))
+    return scores
 
 
 if __name__ == '__main__':
