@@ -12,10 +12,6 @@ import torch
 from torch.utils.data import DataLoader
 import torch.profiler
 
-from sklearn.metrics import roc_curve, roc_auc_score
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.decomposition import PCA
-
 import category_encoders
 from complex_pipeline import (
     clava_clustering,
