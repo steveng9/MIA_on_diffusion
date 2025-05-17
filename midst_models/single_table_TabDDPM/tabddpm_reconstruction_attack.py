@@ -69,7 +69,6 @@ def main():
     else: print("NOT Using CUDA!")
 
     train_diffusion()
-    # gen_synth_data()
     # reconstruct_data()
 
 
@@ -148,6 +147,14 @@ def reconstruct_data():
                     print(f"Column {col} cannot be converted to int.")
 
     reconstructed = cleaned_tables['crc_data']
+
+    print(reconstructed.shape)
+    for col in reconstructed.columns:
+        print(reconstructed[col].isnull().sum())
+        print(np.isinf(reconstructed[col]).sum())
+        print(reconstructed[col].head())
+        print()
+    
 
     reconstruction_scores = pd.DataFrame(index=features_25)
     reconstruction_scores.loc[HIDDEN, "tabddpm_recon"] = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
