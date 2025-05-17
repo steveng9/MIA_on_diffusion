@@ -1,4 +1,4 @@
-ON_UW_SERVER = False
+ON_UW_SERVER = True
 
 import sys
 import os
@@ -30,13 +30,13 @@ verbose = False
 data_path = "/home/golobs/data/" if ON_UW_SERVER \
     else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 # DATA_NAME = "25_Demo_MST_e10_25f"
-# DATA_NAME = "25_Demo_CellSupression_25f"
-DATA_NAME = "7_MST_e10_25f_QID1"
+DATA_NAME = "25_Demo_CellSupression_25f"
+# DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
 HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-num_epochs = 3
+num_epochs = 200_000
 num_epochs_classifier = 20_000
 
 
