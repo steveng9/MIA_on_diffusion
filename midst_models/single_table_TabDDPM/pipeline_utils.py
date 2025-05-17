@@ -563,6 +563,7 @@ def reconstruct_from_diffusion(
         except Exception as e:
             print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
             print(x_cat_col)
+            print(len(x_cat_col))
             raise e
     partial_table_encoded_cat = np.column_stack(encoded_x_cat)
 
