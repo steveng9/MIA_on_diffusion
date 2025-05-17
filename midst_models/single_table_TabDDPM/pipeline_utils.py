@@ -542,8 +542,33 @@ def reconstruct_from_diffusion(
     sample_batch_size=8192,
 ):
 
-    # TODO: make sure this transformation correctly matches how z_norm will look
-    partial_table_encoded = torch.from_numpy(dataset.num_transform.transform(partial_table))
+    num_numerical_features = (
+        dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
+    )
+
+    partial_table_repositioned = partial_table.loc[:, df_info["num_cols"] + df_info["cat_cols"]].to_numpy()
+    known_features_mask = torch.from_numpy(known_features_mask[:, [list(partial_table.columns).index(col) for col in df_info['num_cols']] + [list(partial_table.columns).index(col) for col in df_info['cat_cols']]])
+
+    actual_num_numerical_features = num_numerical_features - len(label_encoders)
+    partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
+    partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
+    encoded_x_cat = []
+    for col in range(partial_cat_.shape[1]):
+        x_cat_col = partial_cat_[:, col]
+        x_cat_col = x_cat_col.astype(int)
+        try:
+            encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
+        except Exception as e:
+            print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
+            raise e
+    partial_table_encoded_cat = np.column_stack(encoded_x_cat)
+
+    partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
+    partial_table_encoded = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
+
+
+
+
     num_numerical_features = (
         dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
     )

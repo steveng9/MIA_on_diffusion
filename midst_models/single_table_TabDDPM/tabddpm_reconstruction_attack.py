@@ -1,4 +1,4 @@
-ON_UW_SERVER = True
+ON_UW_SERVER = False
 
 import sys
 import os
@@ -30,13 +30,13 @@ verbose = False
 data_path = "/home/golobs/data/" if ON_UW_SERVER \
     else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 # DATA_NAME = "25_Demo_MST_e10_25f"
-DATA_NAME = "25_Demo_CellSupression_25f"
-# DATA_NAME = "7_MST_e10_25f_QID1"
+# DATA_NAME = "25_Demo_CellSupression_25f"
+DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
 HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-num_epochs = 200_000
+num_epochs = 3
 num_epochs_classifier = 20_000
 
 
@@ -124,7 +124,7 @@ def reconstruct_data():
 
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     partial_data = partial_data[column_order]
-    known_features_mask = torch.zeros((len(partial_data), 25))
+    known_features_mask = np.zeros((len(partial_data), 25))
     known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
 
     cleaned_tables = clava_reconstructing(
@@ -151,14 +151,6 @@ def reconstruct_data():
     reconstructed = cleaned_tables['crc_data']
     reconstructed.to_csv(data_path + f"reconstructed_{DATA_NAME}.csv")
 
-    print(reconstructed.shape)
-    for col in reconstructed.columns:
-        print(col)
-        print(reconstructed[col].isnull().sum())
-        # print(np.isinf(reconstructed[col]).sum())
-        print(reconstructed[col].head())
-        print()
-
 
     reconstruction_scores = pd.DataFrame(index=features_25)
     scores = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
@@ -167,18 +159,6 @@ def reconstruct_data():
     for x in reconstruction_scores.loc[sorted(HIDDEN), "tabddpm_recon"].T.to_numpy():
         print(x, end=",")
     print(np.array(scores).mean())
-
-    # Set display width very large to avoid wrapping and truncating
-    pd.set_option('display.width', 1000)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_rows', None)
-
-    for l in reconstruction_scores.loc[sorted(HIDDEN)].T.to_numpy()[2:]:
-        for x in l:
-            print(x, end=",")
-        print()
-    print("ave: ", round(reconstruction_scores.loc[sorted(HIDDEN)].T.iloc[2:].mean().mean(), 2))
-
 
 
 
