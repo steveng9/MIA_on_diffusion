@@ -554,17 +554,19 @@ def reconstruct_from_diffusion(
     partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
     encoded_x_cat = []
     for col in range(partial_cat_.shape[1]):
-        x_cat_col = partial_cat_[:, col]
-        print(f"{col}, {df_info['cat_cols'][col]} nans:", np.isnan(x_cat_col).sum())
-        # x_cat_col = np.round(x_cat_col).astype(long)
-        # x_cat_col = np.clip(x_cat_col, 0, len(label_encoders[col].classes_) - 1)
-        try:
-            encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
-        except Exception as e:
-            print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
-            print(x_cat_col)
-            print(len(x_cat_col))
-            raise e
+        if known_features_mask[0, col+actual_num_numerical_features] == 1:
+            x_cat_col = partial_cat_[:, col]
+            print(f"{col}, {df_info['cat_cols'][col]} nans:", np.isnan(x_cat_col).sum())
+            x_cat_col = x_cat_col.astype(int)
+            try:
+                encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
+            except Exception as e:
+                print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
+                print(x_cat_col)
+                print(len(x_cat_col))
+                raise e
+        else:
+            encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
     partial_table_encoded_cat = np.column_stack(encoded_x_cat)
 
     partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
