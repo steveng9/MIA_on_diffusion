@@ -375,25 +375,25 @@ def clava_reconstructing(
         else:
             cols = tables[key]["original_cols"]
         cleaned_tables[key] = val[cols]
-
-    for key, val in cleaned_tables.items():
-        table_dir = os.path.join(
-            configs["general"]["workspace_dir"],
-            configs["general"]["exp_name"],
-            key,
-            f'{configs["general"]["sample_prefix"]}_final',
-        )
-        os.makedirs(table_dir, exist_ok=True)
-        if f"{key}_id" in val.columns:
-            val.to_csv(
-                os.path.join(table_dir, f"{key}_synthetic_with_id.csv"), index=False
-            )
-            val_no_id = val.drop(columns=[f"{key}_id"])
-            val_no_id.to_csv(
-                os.path.join(table_dir, f"{key}_synthetic.csv"), index=False
-            )
-        else:
-            val.to_csv(os.path.join(table_dir, f"{key}_synthetic.csv"), index=False)
+    #
+    # for key, val in cleaned_tables.items():
+    #     table_dir = os.path.join(
+    #         configs["general"]["workspace_dir"],
+    #         configs["general"]["exp_name"],
+    #         key,
+    #         f'{configs["general"]["sample_prefix"]}_final',
+    #     )
+    #     os.makedirs(table_dir, exist_ok=True)
+    #     if f"{key}_id" in val.columns:
+    #         val.to_csv(
+    #             os.path.join(table_dir, f"{key}_synthetic_with_id.csv"), index=False
+    #         )
+    #         val_no_id = val.drop(columns=[f"{key}_id"])
+    #         val_no_id.to_csv(
+    #             os.path.join(table_dir, f"{key}_synthetic.csv"), index=False
+    #         )
+    #     else:
+    #         val.to_csv(os.path.join(table_dir, f"{key}_synthetic.csv"), index=False)
     return cleaned_tables
 
 
