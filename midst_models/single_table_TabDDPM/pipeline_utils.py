@@ -555,7 +555,7 @@ def reconstruct_from_diffusion(
     encoded_x_cat = []
     for col in range(partial_cat_.shape[1]):
         x_cat_col = partial_cat_[:, col]
-        x_cat_col = np.round(x_cat_col).astype(int)
+        # x_cat_col = np.round(x_cat_col).astype(long)
         # x_cat_col = np.clip(x_cat_col, 0, len(label_encoders[col].classes_) - 1)
         try:
             encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
