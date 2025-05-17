@@ -572,12 +572,12 @@ def reconstruct_from_diffusion(
                 valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
                 print("num invalids: ", (1 - valid_mask).sum())
                 common = most_common_value(x_cat_col)
-                x_cat_col[~valid_mask] = common
-                valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
+                x_cat_col_copy = x_cat_col.copy()
+                x_cat_col_copy[~valid_mask] = common
+                valid_mask = np.isin(x_cat_col_copy, label_encoders[col].classes_)
                 print(common, label_encoders[col].classes_)
                 print("num invalids after fixing: ", (1 - valid_mask).sum())
-                encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
-                print(len(x_cat_col))
+                encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
                 raise e
         else:
             encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
