@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from tqdm import tqdm
+from scipy import stats
 
 from .scripts.train import Trainer
 from .scripts.utils_train import get_model, make_dataset_from_df
@@ -563,6 +564,10 @@ def reconstruct_from_diffusion(
             except Exception as e:
                 print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
                 print(x_cat_col)
+                valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
+                print("num invalids: ", (1 - valid_mask).sum())
+                x_cat_col[1-valid_mask] = stats.mode(x_cat_col)
+                encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
                 print(len(x_cat_col))
                 raise e
         else:
