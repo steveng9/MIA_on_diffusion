@@ -149,6 +149,7 @@ def reconstruct_data():
                     print(f"Column {col} cannot be converted to int.")
 
     reconstructed = cleaned_tables['crc_data']
+    reconstructed.to_csv(data_path + f"reconstructed_{DATA_NAME}.csv")
 
     print(reconstructed.shape)
     for col in reconstructed.columns:
