@@ -554,8 +554,8 @@ def reconstruct_from_diffusion(
     partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
     encoded_x_cat = []
     for col in range(partial_cat_.shape[1]):
+        x_cat_col = partial_cat_[:, col]
         if known_features_mask[0, col+actual_num_numerical_features] == 1:
-            x_cat_col = partial_cat_[:, col]
             print(f"{col}, {df_info['cat_cols'][col]} nans:", np.isnan(x_cat_col).sum())
             x_cat_col = x_cat_col.astype(int)
             try:
