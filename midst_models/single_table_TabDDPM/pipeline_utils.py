@@ -556,10 +556,12 @@ def reconstruct_from_diffusion(
     for col in range(partial_cat_.shape[1]):
         x_cat_col = partial_cat_[:, col]
         x_cat_col = np.round(x_cat_col).astype(int)
+        # x_cat_col = np.clip(x_cat_col, 0, len(label_encoders[col].classes_) - 1)
         try:
             encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
         except Exception as e:
             print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
+            print(x_cat_col)
             raise e
     partial_table_encoded_cat = np.column_stack(encoded_x_cat)
 
