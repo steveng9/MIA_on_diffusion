@@ -29,8 +29,8 @@ warnings.filterwarnings("ignore")
 verbose = False
 data_path = "/home/golobs/data/" if ON_UW_SERVER \
     else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
-# DATA_NAME = "25_Demo_MST_e10_25f"
-DATA_NAME = "25_Demo_CellSupression_25f"
+DATA_NAME = "25_Demo_MST_e10_25f"
+# DATA_NAME = "25_Demo_CellSupression_25f"
 # DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
