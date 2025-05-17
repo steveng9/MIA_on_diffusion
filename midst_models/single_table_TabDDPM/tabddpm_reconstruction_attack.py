@@ -154,10 +154,15 @@ def reconstruct_data():
         print(np.isinf(reconstructed[col]).sum())
         print(reconstructed[col].head())
         print()
-    
+
 
     reconstruction_scores = pd.DataFrame(index=features_25)
-    reconstruction_scores.loc[HIDDEN, "tabddpm_recon"] = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
+    scores = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
+    reconstruction_scores.loc[HIDDEN, "tabddpm_recon"] = scores
+
+    for x in reconstruction_scores.loc[sorted(HIDDEN), "tabddpm_recon"].T.to_numpy():
+        print(x, end=",")
+    print(np.array(scores).mean())
 
     # Set display width very large to avoid wrapping and truncating
     pd.set_option('display.width', 1000)
