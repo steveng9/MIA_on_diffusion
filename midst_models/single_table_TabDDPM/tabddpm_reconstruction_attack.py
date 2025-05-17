@@ -68,8 +68,8 @@ def main():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
 
-    train_diffusion()
-    # reconstruct_data()
+    # train_diffusion()
+    reconstruct_data()
 
 
 
