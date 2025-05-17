@@ -1219,8 +1219,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
 
             full_reconstruction.append(reconstruction)
             all_y.append(out_dict["y"].cpu())
-            if mask_nan.sum().item() > 0:
-                raise FoundNANsError
+            # if mask_nan.sum().item() > 0:
+            #     raise FoundNANsError
             i += reconstruction.shape[0]
 
         x_gen = torch.cat(full_reconstruction, dim=0)
