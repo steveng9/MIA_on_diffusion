@@ -542,6 +542,10 @@ def reconstruct_from_diffusion(
     known_features_mask,
     sample_batch_size=8192,
 ):
+    from collections import Counter
+    def most_common_value(arr):
+        counts = Counter(arr)
+        return counts.most_common(1)[0][0]
 
     num_numerical_features = (
         dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
@@ -549,6 +553,7 @@ def reconstruct_from_diffusion(
 
     partial_table_repositioned = partial_table.loc[:, df_info["num_cols"] + df_info["cat_cols"]].to_numpy()
     known_features_mask = torch.from_numpy(known_features_mask[:, [list(partial_table.columns).index(col) for col in df_info['num_cols']] + [list(partial_table.columns).index(col) for col in df_info['cat_cols']]])
+
 
     actual_num_numerical_features = num_numerical_features - len(label_encoders)
     partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
@@ -558,7 +563,7 @@ def reconstruct_from_diffusion(
         x_cat_col = partial_cat_[:, col]
         if known_features_mask[0, col+actual_num_numerical_features] == 1:
             print(f"{col}, {df_info['cat_cols'][col]} nans:", np.isnan(x_cat_col).sum())
-            x_cat_col = x_cat_col.astype(int)
+            x_cat_col = x_cat_col.astype(int).astype(str)
             try:
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
             except Exception as e:
@@ -566,7 +571,7 @@ def reconstruct_from_diffusion(
                 print(x_cat_col)
                 valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
                 print("num invalids: ", (1 - valid_mask).sum())
-                x_cat_col[1-valid_mask] = stats.mode(x_cat_col)
+                x_cat_col[~valid_mask] = most_common_value(x_cat_col)
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
                 print(len(x_cat_col))
                 raise e
