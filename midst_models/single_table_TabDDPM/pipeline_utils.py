@@ -2,7 +2,7 @@ import json
 import os
 import random
 
-import faiss
+# import faiss
 import numpy as np
 import pandas as pd
 import torch
