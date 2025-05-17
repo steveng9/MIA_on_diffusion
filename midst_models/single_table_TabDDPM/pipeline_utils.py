@@ -578,7 +578,6 @@ def reconstruct_from_diffusion(
                 print(common, label_encoders[col].classes_)
                 print("num invalids after fixing: ", (1 - valid_mask).sum())
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
-                raise e
         else:
             encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
     partial_table_encoded_cat = np.column_stack(encoded_x_cat)
