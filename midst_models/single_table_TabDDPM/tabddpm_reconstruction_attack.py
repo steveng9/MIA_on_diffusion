@@ -152,8 +152,9 @@ def reconstruct_data():
 
     print(reconstructed.shape)
     for col in reconstructed.columns:
+        print(col)
         print(reconstructed[col].isnull().sum())
-        print(np.isinf(reconstructed[col]).sum())
+        # print(np.isinf(reconstructed[col]).sum())
         print(reconstructed[col].head())
         print()
 
