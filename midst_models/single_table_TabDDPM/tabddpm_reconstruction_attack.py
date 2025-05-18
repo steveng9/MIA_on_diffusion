@@ -133,6 +133,9 @@ def reconstruct_data(data_name):
     partial_data[hidden_columns] = tables['crc_data']['df'][hidden_columns] # NOTE: temporary measure to make dimensionality match training data
 
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
+    if 'target' in column_order:
+        tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
+
     partial_data = partial_data[column_order]
     known_features_mask = np.zeros((len(partial_data), 25))
     known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
