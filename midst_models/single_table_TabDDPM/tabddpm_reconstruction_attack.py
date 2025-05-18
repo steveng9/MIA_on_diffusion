@@ -69,7 +69,7 @@ def main():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
     data_names = [
-        "25_Demo_AIM_e1_25f",
+        # "25_Demo_AIM_e1_25f",
         "25_Demo_ARF_25f",
         "25_Demo_CellSupression_25f",
         "25_Demo_MST_e10_25f",

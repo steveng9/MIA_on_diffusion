@@ -378,6 +378,7 @@ def load_multi_table(data_dir, verbose=True, metadata_dir=None, dataset_name=Non
         tables[table]["original_cols"] = list(tables[table]["df"].columns)
         tables[table]["original_df"] = tables[table]["df"].copy()
         id_cols = [col for col in tables[table]["df"].columns if "_id" in col]
+        id_cols = id_cols + [col for col in tables[table]["df"].columns if "target" in col]
         df_no_id = tables[table]["df"].drop(columns=id_cols)
         info = get_info_from_domain(df_no_id, tables[table]["domain"])
         data, info = pipeline_process_data(
