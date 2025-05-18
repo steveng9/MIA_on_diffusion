@@ -562,21 +562,17 @@ def reconstruct_from_diffusion(
     for col in range(partial_cat_.shape[1]):
         x_cat_col = partial_cat_[:, col]
         if known_features_mask[0, col+actual_num_numerical_features] == 1:
-            print(f"{col}, {df_info['cat_cols'][col]} nans:", np.isnan(x_cat_col).sum())
             x_cat_col = x_cat_col.astype(int).astype(str)
             try:
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
             except Exception as e:
                 print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
-                print(x_cat_col)
                 valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
                 print("num invalids: ", (1 - valid_mask).sum())
                 common = most_common_value(x_cat_col)
                 x_cat_col_copy = x_cat_col.copy()
                 x_cat_col_copy[~valid_mask] = common
                 valid_mask = np.isin(x_cat_col_copy, label_encoders[col].classes_)
-                print(common, label_encoders[col].classes_)
-                print("num invalids after fixing: ", (1 - valid_mask).sum())
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
         else:
             encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
