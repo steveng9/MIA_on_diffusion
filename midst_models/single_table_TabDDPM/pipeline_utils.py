@@ -1453,6 +1453,8 @@ def match_rows(A, B):
 
 def get_df_without_id(df):
     id_cols = [col for col in df.columns if "_id" in col]
+    if "target" in df.columns:
+        id_cols.append("target")
     return df.drop(columns=id_cols)
 
 
