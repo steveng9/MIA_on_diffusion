@@ -374,6 +374,8 @@ def clava_reconstructing(
             cols.remove("account_id")
         else:
             cols = tables[key]["original_cols"]
+        if 'target' in cols:
+            cols.remove('target')
         cleaned_tables[key] = val[cols]
     #
     # for key, val in cleaned_tables.items():
