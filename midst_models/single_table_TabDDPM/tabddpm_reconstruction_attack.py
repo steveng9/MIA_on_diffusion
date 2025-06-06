@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import pickle
 from argparse import Namespace
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
@@ -64,12 +65,11 @@ def parse_args():
     return Namespace(**parsed_args)
 
 
-
-def main():
+def main_attack():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
     data_names = [
-        # "25_Demo_AIM_e1_25f",
+        "25_Demo_AIM_e1_25f",
         "25_Demo_ARF_25f",
         "25_Demo_CellSupression_25f",
         "25_Demo_MST_e10_25f",
@@ -92,7 +92,8 @@ def train_diffusion(data_name):
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
     DATA_DIR = data_path
-    dataset_name = data_name + "_Deid"
+    # dataset_name = data_name + "_Deid"
+    dataset_name = "refined_training_data"
 
     config_path = "configs_nist_crc/crc_data.json"
     configs, _ = load_configs(config_path, MODEL_PATH)
@@ -254,4 +255,7 @@ def calculate_reconstruction_score(df_original, df_reconstructed, hidden_feature
 
 
 if __name__ == '__main__':
-    main()
+    # main_attack()
+    create_large_training_set()
+
+
