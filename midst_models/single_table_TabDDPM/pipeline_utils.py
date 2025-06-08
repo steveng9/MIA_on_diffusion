@@ -693,6 +693,7 @@ def train_model(
     lr,
     weight_decay,
     device="cuda",
+    for_reconstruction=False, partial_table=None, known_features_mask=None,
 ):
     T = Transformations(**T_dict)
     dataset, label_encoders, column_orders = make_dataset_from_df(
@@ -753,7 +754,48 @@ def train_model(
         steps=steps,
         device=device,
     )
-    trainer.run_loop()
+
+    if for_reconstruction:
+        from collections import Counter
+        def most_common_value(arr):
+            counts = Counter(arr)
+            return counts.most_common(1)[0][0]
+
+        partial_table_repositioned = partial_table.loc[:, df_info["num_cols"] + df_info["cat_cols"]].to_numpy()
+        known_features_mask = torch.from_numpy(known_features_mask[:, [list(partial_table.columns).index(col) for col in
+                                                                       df_info['num_cols']] + [
+                                                                          list(partial_table.columns).index(col) for col
+                                                                          in df_info['cat_cols']]])
+
+        actual_num_numerical_features = dataset.n_num_features - len(label_encoders)
+        partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
+        partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
+        encoded_x_cat = []
+        for col in range(partial_cat_.shape[1]):
+            x_cat_col = partial_cat_[:, col]
+            if known_features_mask[0, col + actual_num_numerical_features] == 1:
+                x_cat_col = x_cat_col.astype(int).astype(str)
+                try:
+                    encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
+                except Exception as e:
+                    print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
+                    valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
+                    print("num invalids: ", (1 - valid_mask).sum())
+                    common = most_common_value(x_cat_col)
+                    x_cat_col_copy = x_cat_col.copy()
+                    x_cat_col_copy[~valid_mask] = common
+                    valid_mask = np.isin(x_cat_col_copy, label_encoders[col].classes_)
+                    encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
+            else:
+                encoded_x_cat.append(np.zeros_like(x_cat_col))  # this won't be looked at so doesn't matter
+        partial_table_encoded_cat = np.column_stack(encoded_x_cat)
+
+        partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
+        partial_table = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
+
+
+
+    trainer.run_loop(for_reconstruction=for_reconstruction, partial_table=partial_table, known_features_mask=known_features_mask)
 
     if model_params["is_y_cond"] == "concat":
         column_orders = column_orders[1:] + [column_orders[0]]
@@ -766,7 +808,6 @@ def train_model(
         "dataset": dataset,
         "column_orders": column_orders,
     }
-
 
 class Classifier(nn.Module):
     def __init__(

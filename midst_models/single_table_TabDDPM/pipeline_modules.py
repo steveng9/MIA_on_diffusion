@@ -78,7 +78,7 @@ def get_T_dict():
 
 
 def child_training(
-    child_df_with_cluster, child_domain_dict, parent_name, child_name, configs
+    child_df_with_cluster, child_domain_dict, parent_name, child_name, configs, for_reconstruction=False, partial_data=None, known_features_mask=None
 ):
     if parent_name is None:
         y_col = "placeholder"
@@ -108,6 +108,7 @@ def child_training(
         configs["diffusion"]["lr"],
         configs["diffusion"]["weight_decay"],
         device="cuda" if torch.cuda.is_available() else "cpu",
+        for_reconstruction=for_reconstruction, partial_table=partial_data, known_features_mask=known_features_mask,
     )
 
     if parent_name is None:

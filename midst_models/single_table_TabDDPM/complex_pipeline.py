@@ -71,7 +71,8 @@ def clava_clustering(tables, relation_order, save_dir, configs):
     return tables, all_group_lengths_prob_dicts
 
 
-def clava_training(tables, relation_order, save_dir, configs):
+def clava_training(tables, relation_order, save_dir, configs,
+                   for_reconstruction=False, partial_data=None, known_features_mask=None):
     models = {}
     for parent, child in relation_order:
         print(f"Training {parent} -> {child} model from scratch")
@@ -79,7 +80,7 @@ def clava_training(tables, relation_order, save_dir, configs):
         id_cols = [col for col in df_with_cluster.columns if "_id" in col]
         df_without_id = df_with_cluster.drop(columns=id_cols)
         result = child_training(
-            df_without_id, tables[child]["domain"], parent, child, configs
+            df_without_id, tables[child]["domain"], parent, child, configs, for_reconstruction=for_reconstruction, partial_data=partial_data, known_features_mask=known_features_mask,
         )
         models[(parent, child)] = result
         pickle.dump(
@@ -89,7 +90,6 @@ def clava_training(tables, relation_order, save_dir, configs):
 
     return models
 
-# def tabddpm_attack(model, tables, configs):
 
 
 class CustomUnpickler(pickle.Unpickler):

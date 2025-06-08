@@ -465,6 +465,7 @@ class MLPDiffusion(nn.Module):
             else:
                 y = y.resize_(y.size(0), 1).float()
             emb += F.silu(self.label_emb(y))
+        x = x.to(torch.float32)
         x = self.proj(x) + emb
         return self.mlp(x)
 

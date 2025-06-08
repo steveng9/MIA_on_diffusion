@@ -1,4 +1,4 @@
-ON_UW_SERVER = True
+ON_UW_SERVER = False
 
 import sys
 import os
@@ -28,11 +28,11 @@ warnings.filterwarnings("ignore")
 
 
 verbose = False
-data_path = "/home/golobs/data/" if ON_UW_SERVER \
-    else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
-# DATA_NAME = "25_Demo_MST_e10_25f"
+# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
+data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
+DATA_NAME = "25_Demo_MST_e10_25f"
 # DATA_NAME = "25_Demo_CellSupression_25f"
-DATA_NAME = "7_MST_e10_25f_QID1"
+# DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
 HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
@@ -69,18 +69,18 @@ def main_attack():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
     data_names = [
-        "25_Demo_AIM_e1_25f",
-        "25_Demo_ARF_25f",
-        "25_Demo_CellSupression_25f",
+        # "25_Demo_AIM_e1_25f",
+        # "25_Demo_ARF_25f",
+        # "25_Demo_CellSupression_25f",
         "25_Demo_MST_e10_25f",
-        "25_Demo_RANKSWAP_25f",
-        "25_Demo_Synthpop_25f",
-        "25_Demo_TVAE_25f",
+        # "25_Demo_RANKSWAP_25f",
+        # "25_Demo_Synthpop_25f",
+        # "25_Demo_TVAE_25f",
     ]
 
     for data_name in data_names:
         train_diffusion(data_name)
-        reconstruct_data(data_name)
+        # reconstruct_data(data_name)
 
 
 
@@ -91,9 +91,13 @@ def train_diffusion(data_name):
     print(f"\nTraining TabDDPM with {num_epochs} epochs\n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
+    targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
+    print(f"targets_name : {targets_name}")
+    targets = pd.read_csv(data_path + targets_name + ".csv")
+    partial_data = targets[QI]
     DATA_DIR = data_path
-    # dataset_name = data_name + "_Deid"
-    dataset_name = "refined_training_data"
+    dataset_name = data_name + "_Deid"
+    # dataset_name = "refined_training_data"
 
     config_path = "configs_nist_crc/crc_data.json"
     configs, _ = load_configs(config_path, MODEL_PATH)
@@ -104,7 +108,21 @@ def train_diffusion(data_name):
     tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
 
-    models = clava_training(tables, relation_order, MODEL_PATH, configs)
+    hidden_columns = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
+    partial_data[hidden_columns] = tables['crc_data']['df'][hidden_columns] # NOTE: temporary measure to make dimensionality match training data
+    column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
+    if 'target' in column_order:
+        column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
+
+    partial_data = partial_data[column_order]
+    known_features_mask = np.zeros((len(partial_data), 25))
+    known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
+
+    # models = clava_training_for_reconstruction(tables, relation_order, MODEL_PATH, configs)
+    models = clava_training(tables, relation_order, MODEL_PATH, configs,
+        for_reconstruction=True,
+        partial_data=partial_data,
+        known_features_mask=known_features_mask)
     # models, tables, all_group_lengths_prob_dicts, dataset_meta, relation_order, configs = train_diffusion_for_attack(num_epochs, MODEL_PATH, DATA_DIR, dataset_name)
 
     os.makedirs(MODEL_PATH + f"/e{num_epochs}", exist_ok=True)
@@ -255,7 +273,6 @@ def calculate_reconstruction_score(df_original, df_reconstructed, hidden_feature
 
 
 if __name__ == '__main__':
-    # main_attack()
-    create_large_training_set()
+    main_attack()
 
 

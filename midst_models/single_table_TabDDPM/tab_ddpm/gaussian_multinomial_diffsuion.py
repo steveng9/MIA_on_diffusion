@@ -696,13 +696,14 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
 
             return -loss
 
-    def mixed_loss(self, x, out_dict):
+    def mixed_loss(self, x, out_dict, for_reconstruction=False, partial_table=None, known_features_mask=None):
         b = x.shape[0]
         device = x.device
         t, pt = self.sample_time(b, device, "uniform")
 
         x_num = x[:, : self.num_numerical_features]
         x_cat = x[:, self.num_numerical_features :]
+        original_data = torch.cat([x_num, x_cat], dim=1)
 
         x_num_t = x_num
         log_x_cat_t = x_cat
@@ -715,6 +716,12 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
 
         x_in = torch.cat([x_num_t, log_x_cat_t], dim=1)
 
+        if for_reconstruction:
+            x_in = original_data * known_features_mask[:b] + x_in * (1 - known_features_mask[:b])
+
+
+
+
         model_out = self._denoise_fn(x_in, t, **out_dict)
 
         model_out_num = model_out[:, : self.num_numerical_features]
@@ -722,13 +729,16 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
 
         loss_multi = torch.zeros((1,)).float()
         loss_gauss = torch.zeros((1,)).float()
+        # todo: Also modify input of _multinomial_loss() function for reconstruction attack training
         if x_cat.shape[1] > 0:
             loss_multi = self._multinomial_loss(
                 model_out_cat, log_x_cat, log_x_cat_t, t, pt, out_dict
             ) / len(self.num_classes)
 
         if x_num.shape[1] > 0:
-            loss_gauss = self._gaussian_loss(model_out_num, x_num, x_num_t, t, noise)
+            # todo: make noise 0 for known_features?
+            # loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise)
+            loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise * (1 - known_features_mask[:b]))
 
         # loss_multi = torch.where(out_dict['y'] == 1, loss_multi, 2 * loss_multi)
         # loss_gauss = torch.where(out_dict['y'] == 1, loss_gauss, 2 * loss_gauss)
