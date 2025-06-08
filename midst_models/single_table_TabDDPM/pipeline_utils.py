@@ -766,6 +766,7 @@ def train_model(
                                                                        df_info['num_cols']] + [
                                                                           list(partial_table.columns).index(col) for col
                                                                           in df_info['cat_cols']]])
+        known_features_mask = known_features_mask.to(device)
 
         actual_num_numerical_features = dataset.n_num_features - len(label_encoders)
         partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
@@ -792,6 +793,7 @@ def train_model(
 
         partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
         partial_table = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
+        partial_table = partial_table.to(device)
 
 
 
