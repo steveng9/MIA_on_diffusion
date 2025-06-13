@@ -738,7 +738,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         if x_num.shape[1] > 0:
             # todo: make noise 0 for known_features?
             # loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise)
-            loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise * (1 - known_features_mask[:b]))
+            # loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise * (1 - known_features_mask[:b]))
+            loss_gauss = self._gaussian_loss(model_out_num, x_num, x_in[:, :self.num_numerical_features], t, noise * (1 - known_features_mask[:b]) + model_out_num * known_features_mask[:b])
 
         # loss_multi = torch.where(out_dict['y'] == 1, loss_multi, 2 * loss_multi)
         # loss_gauss = torch.where(out_dict['y'] == 1, loss_gauss, 2 * loss_gauss)
