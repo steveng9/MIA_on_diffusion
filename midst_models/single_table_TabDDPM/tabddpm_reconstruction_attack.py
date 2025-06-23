@@ -102,7 +102,7 @@ def train_diffusion(data_name):
     if reconstruction:
         dataset_name = data_name + "_Deid"
     else:
-        dataset_name = "25_Demo_25f_OriginalData"
+        dataset_name = "25_Demo_25f_OriginalData_noID"
     # dataset_name = "refined_training_data"
 
     config_path = "configs_nist_crc/crc_data.json"
