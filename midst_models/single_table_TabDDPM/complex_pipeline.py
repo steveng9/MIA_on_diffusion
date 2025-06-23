@@ -131,8 +131,8 @@ def clava_synthesizing(
         df_with_cluster = tables[child]["df"]
         df_without_id = get_df_without_id(df_with_cluster)
 
-        # sample_size = int(sample_scale * len(df_without_id))
-        sample_size = 100
+        sample_size = int(sample_scale * len(df_without_id))
+        # sample_size = 100
         print("Sample size: {}".format(sample_size))
 
         if parent is None:

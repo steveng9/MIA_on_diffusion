@@ -26,7 +26,7 @@ from pipeline_modules import load_multi_table
 import warnings
 warnings.filterwarnings("ignore")
 
-
+reconstruction = False
 verbose = False
 # data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
@@ -37,7 +37,7 @@ DATA_NAME = "25_Demo_MST_e10_25f"
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
 HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-num_epochs = 300_000
+num_epochs = 200_000
 num_epochs_classifier = 20_000
 
 
@@ -80,7 +80,10 @@ def main_attack():
 
     for data_name in data_names:
         train_diffusion(data_name)
-        # reconstruct_data(data_name)
+        if reconstruction:
+            reconstruct_data(data_name)
+        else:
+            gen_synth_data()
 
 
 
@@ -96,7 +99,10 @@ def train_diffusion(data_name):
     targets = pd.read_csv(data_path + targets_name + ".csv")
     partial_data = targets[QI]
     DATA_DIR = data_path
-    dataset_name = data_name + "_Deid"
+    if reconstruction:
+        dataset_name = data_name + "_Deid"
+    else:
+        dataset_name = "25_Demo_25f_OriginalData"
     # dataset_name = "refined_training_data"
 
     config_path = "configs_nist_crc/crc_data.json"
@@ -119,10 +125,14 @@ def train_diffusion(data_name):
     known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
 
     # models = clava_training_for_reconstruction(tables, relation_order, MODEL_PATH, configs)
-    models = clava_training(tables, relation_order, MODEL_PATH, configs,
-        for_reconstruction=True,
-        partial_data=partial_data,
-        known_features_mask=known_features_mask)
+    if reconstruction:
+        models = clava_training(tables, relation_order, MODEL_PATH, configs,
+            for_reconstruction=True,
+            partial_data=partial_data,
+            known_features_mask=known_features_mask)
+    else:
+        models = clava_training(tables, relation_order, MODEL_PATH, configs,
+             for_reconstruction=False)
     # models, tables, all_group_lengths_prob_dicts, dataset_meta, relation_order, configs = train_diffusion_for_attack(num_epochs, MODEL_PATH, DATA_DIR, dataset_name)
 
     os.makedirs(MODEL_PATH + f"/e{num_epochs}", exist_ok=True)
@@ -135,6 +145,7 @@ def train_diffusion(data_name):
 
 
 def reconstruct_data(data_name):
+    print(f"\nReconstructing TabDDPM \n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models"
     targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
@@ -197,12 +208,9 @@ def reconstruct_data(data_name):
 
 
 def gen_synth_data():
-    num_epochs = 3
     print(f"\nSynthesizing TabDDPM \n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models"
-    # dataset_name = "19_CELL_SUPPRESSION_25f_QID1_Deid"
-    dataset_name = "7_MST_e10_25f_QID1_Deid"
 
 
     models = load_artifact(MODEL_PATH + f"/e{num_epochs}/model")
@@ -225,9 +233,9 @@ def gen_synth_data():
     print("\nSynthesizing Complete!\n")
     for key in cleaned_tables.keys():
         print(f"{key}:")
-        print(cleaned_tables[key].head(10))
 
     # Cast int values that saved as string to int for further evaluation
+    synth_final = None
     for key in cleaned_tables.keys():
         for col in cleaned_tables[key].columns:
             if cleaned_tables[key][col].dtype == "object":
@@ -236,6 +244,9 @@ def gen_synth_data():
                 except ValueError:
                     print(f"Column {col} cannot be converted to int.")
 
+        synth_final = cleaned_tables[key]
+
+        synth_final.to_csv(data_path + f"TabDDPM_generated_1.csv")
 
 
 ################################################################
