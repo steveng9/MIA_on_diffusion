@@ -311,6 +311,7 @@ def clava_reconstructing(
     configs,
     partial_table,
     known_features_mask,
+    reconstruct_method_RePaint,
     sample_scale=1,
 ):
     synthetic_tables = {}
@@ -336,6 +337,7 @@ def clava_reconstructing(
         T_dict=result["T_dict"],
         partial_table=partial_table,
         known_features_mask=known_features_mask,
+        reconstruct_method_RePaint=reconstruct_method_RePaint,
         sample_batch_size=configs["sampling"]["batch_size"],
     )
     child_keys = list(range(len(child_generated)))

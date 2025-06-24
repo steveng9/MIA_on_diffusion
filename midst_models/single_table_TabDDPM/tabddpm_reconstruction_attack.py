@@ -26,7 +26,8 @@ from pipeline_modules import load_multi_table
 import warnings
 warnings.filterwarnings("ignore")
 
-reconstruction = False
+reconstruction = True
+reconstruct_method_RePaint = True
 verbose = False
 # data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
@@ -34,10 +35,18 @@ DATA_NAME = "25_Demo_MST_e10_25f"
 # DATA_NAME = "25_Demo_CellSupression_25f"
 # DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
+
+
+# QI 1
 QI = ['F37', 'F41', 'F2', 'F17', 'F22', 'F32', 'F47']
 HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
+
+# QI 2
+# QI = ['F37', 'F41', 'F3', 'F13', 'F18', 'F23', 'F30']
+# HIDDEN = ['F11', 'F43', 'F5', 'F36', 'F25', 'F47', 'F32', 'F15', 'F33', 'F17', 'F10', 'F12', 'F2', 'F1', 'F50', 'F22', 'F9', 'F21']
+
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-num_epochs = 200_000
+num_epochs = 20
 num_epochs_classifier = 20_000
 
 
@@ -114,8 +123,7 @@ def train_diffusion(data_name):
     tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
 
-    hidden_columns = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
-    partial_data[hidden_columns] = tables['crc_data']['df'][hidden_columns] # NOTE: temporary measure to make dimensionality match training data
+    partial_data[HIDDEN] = tables['crc_data']['df'][HIDDEN] # NOTE: temporary measure to make dimensionality match training data
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     if 'target' in column_order:
         column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
@@ -127,7 +135,7 @@ def train_diffusion(data_name):
     # models = clava_training_for_reconstruction(tables, relation_order, MODEL_PATH, configs)
     if reconstruction:
         models = clava_training(tables, relation_order, MODEL_PATH, configs,
-            for_reconstruction=True,
+            for_reconstruction=not reconstruct_method_RePaint,
             partial_data=partial_data,
             known_features_mask=known_features_mask)
     else:
@@ -159,8 +167,7 @@ def reconstruct_data(data_name):
     dataset_meta = load_artifact(MODEL_PATH + f"/e{num_epochs}/dataset_meta")
     relation_order = load_artifact(MODEL_PATH + f"/e{num_epochs}/relation_order")
     configs = load_artifact(MODEL_PATH + f"/e{num_epochs}/configs")
-    hidden_columns = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
-    partial_data[hidden_columns] = tables['crc_data']['df'][hidden_columns] # NOTE: temporary measure to make dimensionality match training data
+    partial_data[HIDDEN] = tables['crc_data']['df'][HIDDEN] # NOTE: temporary measure to make dimensionality match training data
 
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     if 'target' in column_order:
@@ -179,6 +186,7 @@ def reconstruct_data(data_name):
         configs,
         partial_data,
         known_features_mask,
+        reconstruct_method_RePaint,
         sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
     )
 

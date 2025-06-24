@@ -1110,7 +1110,6 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
     ):
         device = self.log_alpha.device
         z_norm = torch.randn((b, self.num_numerical_features), device=device)
-        known_features_mask
 
         has_cat = self.num_classes[0] != 0
         log_z = torch.zeros((b, 0), device=device).float()
@@ -1155,6 +1154,86 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         if has_cat:
             z_cat = ohe_to_categories(z_ohe, self.num_classes)
         reconstruction = torch.cat([z_norm, z_cat], dim=1).cpu()
+        return reconstruction, out_dict
+
+
+
+    @torch.no_grad()
+    def reconstruct_RePaint(self, b, y_dist,
+        known_features_mask,
+        known_features_values,
+        model_kwargs=None, cond_fn=None
+    ):
+        device = self.log_alpha.device
+        z_norm = torch.randn((b, self.num_numerical_features), device=device)
+
+        has_cat = self.num_classes[0] != 0
+        log_z = torch.zeros((b, 0), device=device).float()
+        # if has_cat:
+        #     todo later
+
+        y = torch.multinomial(y_dist, num_samples=b, replacement=True)
+        out_dict = {"y": y.long().to(device)}
+        for i in reversed(range(0, self.num_timesteps)):
+            print(f"Sample timestep {i:4d}", end="\r")
+            t = torch.full((b,), i, device=device, dtype=torch.long)
+
+            x_num = known_features_values[:, : self.num_numerical_features]
+            x_cat = known_features_values[:, self.num_numerical_features:]
+
+            z_norm_tp1 = z_norm
+
+            # (step 5, i.e. repeat steps 1 - 4 several times)
+            for _ in range(3):
+                # step 1
+                if x_num.shape[1] > 0:
+                    noise = torch.randn_like(x_num)
+                    x_num_t = self.gaussian_q_sample(x_num, t, noise=noise)
+                # if x_cat.shape[1] > 0:  # todo
+                # x_t = torch.cat([x_num_t, log_x_cat_t], dim=1)
+                x_t = x_num_t
+
+                # step 2
+                model_out = self._denoise_fn(
+                    torch.cat([z_norm_tp1, log_z], dim=1).float(), t, **out_dict
+                )
+                model_out_num = model_out[:, : self.num_numerical_features]
+                # model_out_cat = model_out[:, self.num_numerical_features :]
+
+                z_norm_t = self.gaussian_p_sample(
+                    model_out_num,
+                    z_norm_tp1,
+                    t,
+                    clip_denoised=False,
+                    model_kwargs=model_kwargs,
+                    cond_fn=cond_fn,
+                )["sample"]
+                # if has_cat: # todo
+
+                # step 3
+                z_norm_t = x_t * known_features_mask + z_norm_t * (1 - known_features_mask)
+
+                # step 4
+                if x_num.shape[1] > 0:
+                    noise = torch.randn_like(x_num)
+                    try:
+                        # calling gaussian_q_sample() with (t+1) doesn't work for maximum t, but instead calling it with t should be fine
+                        x_num_tp1 = self.gaussian_q_sample(z_norm_t, t, noise=noise)
+                    except RuntimeError:
+                        print()
+
+                # if x_cat.shape[1] > 0: # todo
+                # x_t = torch.cat([x_num_t, log_x_cat_t], dim=1)
+                z_norm_tp1 = x_num_tp1
+                z_norm = z_norm_t
+
+        print()
+        # z_ohe = torch.exp(log_z).round()
+        # z_cat = log_z
+        # if has_cat:
+        #     z_cat = ohe_to_categories(z_ohe, self.num_classes)
+        # reconstruction = torch.cat([z_norm, z_cat], dim=1).cpu()
+        reconstruction = z_norm.cpu()
         return reconstruction, out_dict
 
 
@@ -1204,6 +1283,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         y_dist,
         known_features_mask,
         known_features_values,
+        reconstruct_method_RePaint,
         ddim=False,
         model_kwargs=None,
         cond_fn=None,
@@ -1220,12 +1300,20 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         i = 0
         while i < N:
             b_ = min(b, N-i)
-            reconstruction, out_dict = self.reconstruct(
-                b_, y_dist,
-                known_features_mask[i:i+b_],
-                known_features_values[i:i+b_],
-                model_kwargs=model_kwargs, cond_fn=cond_fn
-            )
+            if reconstruct_method_RePaint:
+                reconstruction, out_dict = self.reconstruct_RePaint(
+                    b_, y_dist,
+                    known_features_mask[i:i+b_],
+                    known_features_values[i:i+b_],
+                    model_kwargs=model_kwargs, cond_fn=cond_fn
+                )
+            else:
+                reconstruction, out_dict = self.reconstruct(
+                    b_, y_dist,
+                    known_features_mask[i:i+b_],
+                    known_features_values[i:i+b_],
+                    model_kwargs=model_kwargs, cond_fn=cond_fn
+                )
             mask_nan = torch.any(reconstruction.isnan(), dim=1)
             # reconstruction = reconstruction[~mask_nan]
             # out_dict["y"] = out_dict["y"][~mask_nan]

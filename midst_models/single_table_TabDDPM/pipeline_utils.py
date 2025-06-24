@@ -541,6 +541,7 @@ def reconstruct_from_diffusion(
     T_dict,
     partial_table,
     known_features_mask,
+    reconstruct_method_RePaint,
     sample_batch_size=8192,
 ):
     from collections import Counter
@@ -599,7 +600,7 @@ def reconstruct_from_diffusion(
         torch.from_numpy(dataset.y["train"]), return_counts=True
     )
     x_gen, y_gen = diffusion.reconstruct_all(
-        sample_batch_size, empirical_class_dist.float(), known_features_mask, partial_table_encoded, ddim=False
+        sample_batch_size, empirical_class_dist.float(), known_features_mask, partial_table_encoded, reconstruct_method_RePaint, ddim=False
     )
     X_gen, y_gen = x_gen.numpy(), y_gen.numpy()
     num_numerical_features_sample = num_numerical_features + int(
