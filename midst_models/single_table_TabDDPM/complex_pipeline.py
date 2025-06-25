@@ -313,6 +313,7 @@ def clava_reconstructing(
     known_features_mask,
     reconstruct_method_RePaint,
     sample_scale=1,
+    jumps=None,
 ):
     synthetic_tables = {}
 
@@ -339,6 +340,7 @@ def clava_reconstructing(
         known_features_mask=known_features_mask,
         reconstruct_method_RePaint=reconstruct_method_RePaint,
         sample_batch_size=configs["sampling"]["batch_size"],
+        jumps=jumps,
     )
     child_keys = list(range(len(child_generated)))
     generated_final_arr = np.concatenate(

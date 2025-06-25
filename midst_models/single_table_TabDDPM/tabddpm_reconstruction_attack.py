@@ -26,6 +26,11 @@ from pipeline_modules import load_multi_table
 import warnings
 warnings.filterwarnings("ignore")
 
+
+num_epochs = 20
+jumps = 5
+num_epochs_classifier = 20_000
+
 reconstruction = True
 reconstruct_method_RePaint = True
 verbose = False
@@ -46,8 +51,6 @@ HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', '
 # HIDDEN = ['F11', 'F43', 'F5', 'F36', 'F25', 'F47', 'F32', 'F15', 'F33', 'F17', 'F10', 'F12', 'F2', 'F1', 'F50', 'F22', 'F9', 'F21']
 
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-num_epochs = 20
-num_epochs_classifier = 20_000
 
 
 
@@ -188,6 +191,7 @@ def reconstruct_data(data_name):
         known_features_mask,
         reconstruct_method_RePaint,
         sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
+        jumps=jumps,
     )
 
     # Cast int values that saved as string to int for further evaluation

@@ -1162,6 +1162,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
     def reconstruct_RePaint(self, b, y_dist,
         known_features_mask,
         known_features_values,
+        jumps,
         model_kwargs=None, cond_fn=None
     ):
         device = self.log_alpha.device
@@ -1184,7 +1185,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
             z_norm_tp1 = z_norm
 
             # (step 5, i.e. repeat steps 1 - 4 several times)
-            for _ in range(3):
+            for _ in range(jumps):
                 # step 1
                 if x_num.shape[1] > 0:
                     noise = torch.randn_like(x_num)
@@ -1284,6 +1285,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         known_features_mask,
         known_features_values,
         reconstruct_method_RePaint,
+        jumps=None,
         ddim=False,
         model_kwargs=None,
         cond_fn=None,
@@ -1305,6 +1307,7 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                     b_, y_dist,
                     known_features_mask[i:i+b_],
                     known_features_values[i:i+b_],
+                    jumps,
                     model_kwargs=model_kwargs, cond_fn=cond_fn
                 )
             else:
