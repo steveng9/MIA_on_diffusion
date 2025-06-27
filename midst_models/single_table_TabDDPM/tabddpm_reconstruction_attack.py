@@ -54,29 +54,6 @@ features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 
 
 
 
-acceptable_args = {
-    "action": str,
-    "model": int,
-    "all_models": str,
-    "save_score": bool,
-    "AD": int,  # Number of Denoiser epochs on auxiliary data
-    "SD": int,  # Number of Denoiser epochs on synthetic data
-}
-
-def parse_args():
-    parsed_args = {}
-    for arg in sys.argv[1:]:
-        if '=' in arg:
-            key, value = arg.split('=', 1)  # Split only on the first '='
-            try:
-                parsed_args[key] = acceptable_args[key](value)
-            except KeyError:
-                raise KeyError(f"Invalid argument argument: {key}. \nAvailable arguments: {acceptable_args}")
-        else:
-            raise ValueError(f"Invalid argument format: {arg}. Expected 'keyword=value'.")
-    return Namespace(**parsed_args)
-
-
 def main_attack():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
@@ -99,17 +76,51 @@ def main_attack():
 
 
 
+def one_feature_at_a_time_attack():
+    if torch.cuda.is_available(): print("Using CUDA device :)")
+    else: print("NOT Using CUDA!")
+    data_names = [
+        # "25_Demo_AIM_e1_25f",
+        # "25_Demo_ARF_25f",
+        # "25_Demo_CellSupression_25f",
+        # "25_Demo_MST_e10_25f",
+        # "25_Demo_RANKSWAP_25f",
+        "25_Demo_Synthpop_25f",
+        # "25_Demo_TVAE_25f",
+    ]
+
+    # hidden_features = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
+
+    for data_name in data_names:
+        print(data_name)
+        scores = []
+        for hidden_feature in sorted(HIDDEN):
+            synth = pd.read_csv(data_path + data_name + "_Deid.csv")
+            synth_with_only_one_hidden_features = synth[QI + [hidden_feature]]
+            data_name += "_reduced"
+            synth_with_only_one_hidden_features.to_csv(data_path + data_name + "_Deid.csv")
+
+            train_diffusion(data_name, qi=QI, hidden_features=[hidden_feature])
+            score = reconstruct_data(data_name, qi=QI, hidden_features=[hidden_feature])
+            print("\n\n\nSCORE for ", hidden_feature, score)
+            scores.append(score)
+        print()
+        print()
+        print(scores)
 
 
 
-def train_diffusion(data_name):
+
+
+
+def train_diffusion(data_name, qi=QI, hidden_features=HIDDEN):
     print(f"\nTraining TabDDPM with {num_epochs} epochs\n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
     targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
     print(f"targets_name : {targets_name}")
     targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[QI]
+    partial_data = targets[qi]
     DATA_DIR = data_path
     if reconstruction:
         dataset_name = data_name + "_Deid"
@@ -126,14 +137,14 @@ def train_diffusion(data_name):
     tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
 
-    partial_data[HIDDEN] = tables['crc_data']['df'][HIDDEN] # NOTE: temporary measure to make dimensionality match training data
+    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     if 'target' in column_order:
         column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
 
     partial_data = partial_data[column_order]
     known_features_mask = np.zeros((len(partial_data), 25))
-    known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
+    known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
 
     # models = clava_training_for_reconstruction(tables, relation_order, MODEL_PATH, configs)
     if reconstruction:
@@ -155,14 +166,14 @@ def train_diffusion(data_name):
     dump_artifact(configs, MODEL_PATH + f"/configs")
 
 
-def reconstruct_data(data_name):
+def reconstruct_data(data_name, qi=QI, hidden_features=HIDDEN):
     print(f"\nReconstructing TabDDPM \n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models"
     targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
     print(f"targets_name : {targets_name}")
     targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[QI]
+    partial_data = targets[qi]
 
     models = load_artifact(MODEL_PATH + f"/e{num_epochs}/model")
     tables = load_artifact(MODEL_PATH + f"/e{num_epochs}/tables")
@@ -170,7 +181,7 @@ def reconstruct_data(data_name):
     dataset_meta = load_artifact(MODEL_PATH + f"/e{num_epochs}/dataset_meta")
     relation_order = load_artifact(MODEL_PATH + f"/e{num_epochs}/relation_order")
     configs = load_artifact(MODEL_PATH + f"/e{num_epochs}/configs")
-    partial_data[HIDDEN] = tables['crc_data']['df'][HIDDEN] # NOTE: temporary measure to make dimensionality match training data
+    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
 
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     if 'target' in column_order:
@@ -178,7 +189,7 @@ def reconstruct_data(data_name):
 
     partial_data = partial_data[column_order]
     known_features_mask = np.zeros((len(partial_data), 25))
-    known_features_mask[:, [partial_data.columns.get_loc(col) for col in QI]] = 1
+    known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
 
     cleaned_tables = clava_reconstructing(
         tables,
@@ -208,14 +219,15 @@ def reconstruct_data(data_name):
 
 
     reconstruction_scores = pd.DataFrame(index=features_25)
-    scores = calculate_reconstruction_score(targets, reconstructed, HIDDEN)
-    reconstruction_scores.loc[HIDDEN, "tabddpm_recon"] = scores
+    scores = calculate_reconstruction_score(targets, reconstructed, hidden_features)
+    reconstruction_scores.loc[hidden_features, "tabddpm_recon"] = scores
 
     print(f"\n\nDeid = {data_name}:\n")
-    for x in reconstruction_scores.loc[sorted(HIDDEN), "tabddpm_recon"].T.to_numpy():
+    for x in reconstruction_scores.loc[sorted(hidden_features), "tabddpm_recon"].T.to_numpy():
         print(x, end=",")
     print(np.array(scores).mean())
     print(f"\n\n\n\n\n")
+    return np.array(scores).mean()
 
 
 
@@ -296,6 +308,6 @@ def calculate_reconstruction_score(df_original, df_reconstructed, hidden_feature
 
 
 if __name__ == '__main__':
-    main_attack()
-
+    # main_attack()
+    one_feature_at_a_time_attack()
 
