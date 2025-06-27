@@ -1195,16 +1195,16 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                 x_t = x_num_t
 
                 # step 2
-                model_out = self._denoise_fn(
-                    torch.cat([z_norm_tp1, log_z], dim=1).float(), t, **out_dict
-                )
+                # model_out = self._denoise_fn(torch.cat([z_norm_tp1, log_z], dim=1).float(), t, **out_dict)
+                temp_t = torch.full((b,), 1, device=device, dtype=torch.long)
+                model_out = self._denoise_fn(torch.cat([z_norm_tp1, log_z], dim=1).float(), temp_t, **out_dict)
                 model_out_num = model_out[:, : self.num_numerical_features]
                 # model_out_cat = model_out[:, self.num_numerical_features :]
 
                 z_norm_t = self.gaussian_p_sample(
                     model_out_num,
                     z_norm_tp1,
-                    t,
+                    temp_t,
                     clip_denoised=False,
                     model_kwargs=model_kwargs,
                     cond_fn=cond_fn,
@@ -1217,16 +1217,24 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                 # step 4
                 if x_num.shape[1] > 0:
                     noise = torch.randn_like(x_num)
-                    try:
-                        # calling gaussian_q_sample() with (t+1) doesn't work for maximum t, but instead calling it with t should be fine
-                        x_num_tp1 = self.gaussian_q_sample(z_norm_t, t, noise=noise)
-                    except RuntimeError:
-                        print()
+                    # calling gaussian_q_sample() with (t+1) doesn't work for maximum t, but instead calling it with t should be fine
+                    x_num_tp1 = self.gaussian_q_sample(z_norm_t, temp_t, noise=noise)
 
                 # if x_cat.shape[1] > 0: # todo
                 # x_t = torch.cat([x_num_t, log_x_cat_t], dim=1)
                 z_norm_tp1 = x_num_tp1
                 z_norm = z_norm_t
+
+            model_out = self._denoise_fn(torch.cat([z_norm_tp1, log_z], dim=1).float(), t, **out_dict)
+            model_out_num = model_out[:, : self.num_numerical_features]
+            z_norm_t = self.gaussian_p_sample(
+                model_out_num,
+                z_norm_tp1,
+                t,
+                clip_denoised=False,
+                model_kwargs=model_kwargs,
+                cond_fn=cond_fn,
+            )["sample"]
 
         print()
         # z_ohe = torch.exp(log_z).round()
