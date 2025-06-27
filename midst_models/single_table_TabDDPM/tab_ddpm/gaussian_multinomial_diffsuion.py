@@ -1148,7 +1148,6 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
             if has_cat:
                 log_z = self.p_sample(model_out_cat, log_z, t, out_dict)
 
-        print()
         z_ohe = torch.exp(log_z).round()
         z_cat = log_z
         if has_cat:
@@ -1176,6 +1175,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         y = torch.multinomial(y_dist, num_samples=b, replacement=True)
         out_dict = {"y": y.long().to(device)}
         for i in reversed(range(0, self.num_timesteps)):
+            print(i, end=", ")
+
             print(f"Sample timestep {i:4d}", end="\r")
             t = torch.full((b,), i, device=device, dtype=torch.long)
 

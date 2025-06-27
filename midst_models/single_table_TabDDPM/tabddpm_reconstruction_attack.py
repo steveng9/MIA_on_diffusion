@@ -27,12 +27,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-num_epochs = 20
-jumps = 5
+num_epochs = 200_000
+jumps = 10
 num_epochs_classifier = 20_000
 
 reconstruction = True
-reconstruct_method_RePaint = True
+reconstruct_method_RePaint = False
 verbose = False
 # data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
@@ -68,6 +68,8 @@ def main_attack():
     ]
 
     for data_name in data_names:
+        print(f"\n\n\n\n\n")
+
         train_diffusion(data_name)
         if reconstruction:
             reconstruct_data(data_name)
@@ -89,20 +91,20 @@ def one_feature_at_a_time_attack():
         # "25_Demo_TVAE_25f",
     ]
 
-    # hidden_features = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', 'F30', 'F10', 'F12', 'F50', 'F3', 'F1', 'F9', 'F21']
-
     for data_name in data_names:
+        print(f"\n\n\n\n\n")
         print(data_name)
         scores = []
         for hidden_feature in sorted(HIDDEN):
+            data_name_reduced = data_name + "_reduced"
+
             synth = pd.read_csv(data_path + data_name + "_Deid.csv")
             synth_with_only_one_hidden_features = synth[QI + [hidden_feature]]
-            data_name += "_reduced"
-            synth_with_only_one_hidden_features.to_csv(data_path + data_name + "_Deid.csv")
+            synth_with_only_one_hidden_features.to_csv(data_path + data_name_reduced + "_Deid.csv", index=False)
+            train_diffusion(data_name_reduced, qi=QI, hidden_features=[hidden_feature])
 
-            train_diffusion(data_name, qi=QI, hidden_features=[hidden_feature])
-            score = reconstruct_data(data_name, qi=QI, hidden_features=[hidden_feature])
-            print("\n\n\nSCORE for ", hidden_feature, score)
+            score = reconstruct_data(data_name_reduced, qi=QI, hidden_features=[hidden_feature])
+            print("SCORE for ", hidden_feature, score)
             scores.append(score)
         print()
         print()
@@ -226,7 +228,6 @@ def reconstruct_data(data_name, qi=QI, hidden_features=HIDDEN):
     for x in reconstruction_scores.loc[sorted(hidden_features), "tabddpm_recon"].T.to_numpy():
         print(x, end=",")
     print(np.array(scores).mean())
-    print(f"\n\n\n\n\n")
     return np.array(scores).mean()
 
 
