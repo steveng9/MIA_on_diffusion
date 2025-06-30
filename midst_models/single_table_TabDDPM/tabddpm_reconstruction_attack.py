@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import numpy as np
 import pickle
+import math
 from argparse import Namespace
 from pathlib import Path
 
@@ -28,11 +29,13 @@ warnings.filterwarnings("ignore")
 
 
 num_epochs = 200_000
-jumps = 10
+resamples = 10
+jump = lambda t: max(0, t-10)
+# jump = lambda t: math.floor(t*.75)
 num_epochs_classifier = 20_000
 
 reconstruction = True
-reconstruct_method_RePaint = False
+reconstruct_method_RePaint = True
 verbose = False
 # data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
 data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
@@ -204,7 +207,8 @@ def reconstruct_data(data_name, qi=QI, hidden_features=HIDDEN):
         known_features_mask,
         reconstruct_method_RePaint,
         sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
-        jumps=jumps,
+        resamples=resamples,
+        jump=jump,
     )
 
     # Cast int values that saved as string to int for further evaluation

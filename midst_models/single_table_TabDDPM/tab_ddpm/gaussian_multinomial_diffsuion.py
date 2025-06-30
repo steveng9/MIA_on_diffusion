@@ -1161,7 +1161,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
     def reconstruct_RePaint(self, b, y_dist,
         known_features_mask,
         known_features_values,
-        jumps,
+        resamples,
+        jump,
         model_kwargs=None, cond_fn=None
     ):
         device = self.log_alpha.device
@@ -1175,37 +1176,33 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         y = torch.multinomial(y_dist, num_samples=b, replacement=True)
         out_dict = {"y": y.long().to(device)}
         for i in reversed(range(0, self.num_timesteps)):
-            print(i, end=", ")
-
+            jump_ = jump(i)
             print(f"Sample timestep {i:4d}", end="\r")
             t = torch.full((b,), i, device=device, dtype=torch.long)
 
             x_num = known_features_values[:, : self.num_numerical_features]
-            x_cat = known_features_values[:, self.num_numerical_features:]
+            # x_cat = known_features_values[:, self.num_numerical_features:]
 
-            z_norm_tp1 = z_norm
+            z_norm_t = z_norm
 
             # (step 5, i.e. repeat steps 1 - 4 several times)
-            for _ in range(jumps):
+            for _ in range(resamples):
+                jump_t = torch.full((b,), jump_, device=device, dtype=torch.long)
                 # step 1
-                if x_num.shape[1] > 0:
-                    noise = torch.randn_like(x_num)
-                    x_num_t = self.gaussian_q_sample(x_num, t, noise=noise)
+                noise = torch.randn_like(x_num)
+                x_jump_t = self.gaussian_q_sample(x_num, jump_t, noise=noise)
                 # if x_cat.shape[1] > 0:  # todo
                 # x_t = torch.cat([x_num_t, log_x_cat_t], dim=1)
-                x_t = x_num_t
 
                 # step 2
-                # temp_t = torch.full((b,), 1, device=device, dtype=torch.long)
-                # model_out = self._denoise_fn(torch.cat([z_norm_tp1, log_z], dim=1).float(), temp_t, **out_dict)
-                model_out = self._denoise_fn(torch.cat([z_norm_tp1, log_z], dim=1).float(), t, **out_dict)
+                model_out = self._denoise_fn(torch.cat([z_norm_t, log_z], dim=1).float(), jump_t, **out_dict)
                 model_out_num = model_out[:, : self.num_numerical_features]
                 # model_out_cat = model_out[:, self.num_numerical_features :]
 
-                z_norm_t = self.gaussian_p_sample(
+                z_norm_jump_t = self.gaussian_p_sample(
                     model_out_num,
-                    z_norm_tp1,
-                    t,
+                    z_norm_t,
+                    jump_t,
                     clip_denoised=False,
                     model_kwargs=model_kwargs,
                     cond_fn=cond_fn,
@@ -1213,18 +1210,16 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                 # if has_cat: # todo
 
                 # step 3
-                z_norm_t = x_t * known_features_mask + z_norm_t * (1 - known_features_mask)
+                z_norm_jump_t = x_jump_t * known_features_mask + z_norm_jump_t * (1 - known_features_mask)
 
                 # step 4
-                if x_num.shape[1] > 0:
-                    noise = torch.randn_like(x_num)
-                    # calling gaussian_q_sample() with (t+1) doesn't work for maximum t, but instead calling it with t should be fine
-                    x_num_tp1 = self.gaussian_q_sample(z_norm_t, t, noise=noise)
+                noise = torch.randn_like(x_num)
+                x_num_t = self.gaussian_q_sample(z_norm_jump_t, t, noise=noise)
 
                 # if x_cat.shape[1] > 0: # todo
                 # x_t = torch.cat([x_num_t, log_x_cat_t], dim=1)
-                z_norm_tp1 = x_num_tp1
-                z_norm = z_norm_t
+                z_norm_t = x_num_t
+                z_norm = z_norm_jump_t
 
         # z_ohe = torch.exp(log_z).round()
         # z_cat = log_z
@@ -1282,7 +1277,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
         known_features_mask,
         known_features_values,
         reconstruct_method_RePaint,
-        jumps=None,
+        resamples=None,
+        jump=None,
         ddim=False,
         model_kwargs=None,
         cond_fn=None,
@@ -1304,7 +1300,8 @@ class GaussianMultinomialDiffusion(torch.nn.Module):
                     b_, y_dist,
                     known_features_mask[i:i+b_],
                     known_features_values[i:i+b_],
-                    jumps,
+                    resamples,
+                    jump,
                     model_kwargs=model_kwargs, cond_fn=cond_fn
                 )
             else:
