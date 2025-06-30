@@ -98,7 +98,8 @@ def one_feature_at_a_time_attack():
         print(f"\n\n\n\n\n")
         print(data_name)
         scores = []
-        for hidden_feature in sorted(HIDDEN):
+        # for hidden_feature in sorted(HIDDEN):
+        for hidden_feature in sorted(['F11', 'F13', 'F23']):
             data_name_reduced = data_name + "_reduced"
 
             synth = pd.read_csv(data_path + data_name + "_Deid.csv")
