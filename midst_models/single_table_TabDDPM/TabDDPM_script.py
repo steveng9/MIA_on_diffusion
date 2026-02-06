@@ -36,7 +36,7 @@ num_epochs_default = 100_000
 num_timesteps_default = 1000
 verbose = True
 
-DATA_DIR = "/home/golobs/data/NIST_CRC/25_PracticeProblem" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/reconstruction_project/data/nist_arizona_data/NIST_CRC/25_PracticeProblem/"
+DATA_DIR = "/home/golobs/data/NIST_CRC/25_PracticeProblem/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/reconstruction_project/data/nist_arizona_data/NIST_CRC/25_PracticeProblem/"
 DATA_NAME = "25_Demo_25f_OriginalData"
 MODEL_PATH = DATA_DIR + f"tabddpm_models/"
 META_PATH = DATA_DIR + f"tabddpm_meta/"
