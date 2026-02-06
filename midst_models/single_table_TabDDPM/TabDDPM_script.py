@@ -4,7 +4,6 @@
 
 # from midst_models.single_table_TabDDPM.pipeline_utils import load_multi_table_CUSTOM
 
-ON_UW_SERVER = False
 
 import sys
 import os
@@ -28,6 +27,7 @@ warnings.filterwarnings("ignore")
 
 
 
+ON_UW_SERVER = len(sys.argv) > 1 and sys.argv[1] == "T"
 dropout_default = 0.1
 batch_size_default = 4096
 lr_default =  0.0006
