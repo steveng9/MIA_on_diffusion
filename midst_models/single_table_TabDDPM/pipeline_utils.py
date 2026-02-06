@@ -378,6 +378,7 @@ def load_multi_table(data_dir, verbose=True, metadata_dir=None, dataset_name=Non
         tables[table]["original_cols"] = list(tables[table]["df"].columns)
         tables[table]["original_df"] = tables[table]["df"].copy()
         id_cols = [col for col in tables[table]["df"].columns if "_id" in col]
+        id_cols = id_cols + [col for col in tables[table]["df"].columns if "ID" in col]
         id_cols = id_cols + [col for col in tables[table]["df"].columns if "target" in col]
         df_no_id = tables[table]["df"].drop(columns=id_cols)
         info = get_info_from_domain(df_no_id, tables[table]["domain"])
@@ -393,6 +394,36 @@ def load_multi_table(data_dir, verbose=True, metadata_dir=None, dataset_name=Non
 
     return tables, relation_order, dataset_meta
 
+
+def load_multi_table_CUSTOM(dataset_meta, dataset_domain, train_df, verbose=True):
+    relation_order = dataset_meta["relation_order"]
+    tables = {}
+    table = list(dataset_meta["tables"].keys())[0]
+    tables[table] = {
+        "df": train_df,
+        "domain": dataset_domain,
+        "children": [],
+        "parents": [],
+    }
+    tables[table]["original_cols"] = list(train_df.columns)
+    tables[table]["original_df"] = train_df.copy()
+
+    # I assume all columns are non-id
+    # id_cols = [col for col in tables[table]["df"].columns if "_id" in col]
+    # id_cols = id_cols + [col for col in tables[table]["df"].columns if "target" in col]
+    # df_no_id = tables[table]["df"].drop(columns=id_cols)
+    info = get_info_from_domain(train_df, dataset_domain)
+    data, info = pipeline_process_data(
+        name=table,
+        data_df=train_df,
+        info=info,
+        ratio=1,
+        save=False,
+        verbose=verbose,
+    )
+    tables[table]["info"] = info
+
+    return tables, relation_order, dataset_meta
 
 def quantile_normalize_sklearn(matrix):
     transformer = QuantileTransformer(
@@ -696,7 +727,7 @@ def train_model(
     lr,
     weight_decay,
     device="cuda",
-    for_reconstruction=False, partial_table=None, known_features_mask=None,
+    for_reconstruction=False, known_features_mask=None,
 ):
     T = Transformations(**T_dict)
     dataset, label_encoders, column_orders = make_dataset_from_df(
@@ -758,49 +789,7 @@ def train_model(
         device=device,
     )
 
-    if for_reconstruction:
-        from collections import Counter
-        def most_common_value(arr):
-            counts = Counter(arr)
-            return counts.most_common(1)[0][0]
-
-        partial_table_repositioned = partial_table.loc[:, df_info["num_cols"] + df_info["cat_cols"]].to_numpy()
-        known_features_mask = torch.from_numpy(known_features_mask[:, [list(partial_table.columns).index(col) for col in
-                                                                       df_info['num_cols']] + [
-                                                                          list(partial_table.columns).index(col) for col
-                                                                          in df_info['cat_cols']]])
-        known_features_mask = known_features_mask.to(device)
-
-        actual_num_numerical_features = dataset.n_num_features - len(label_encoders)
-        partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
-        partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
-        encoded_x_cat = []
-        for col in range(partial_cat_.shape[1]):
-            x_cat_col = partial_cat_[:, col]
-            if known_features_mask[0, col + actual_num_numerical_features] == 1:
-                x_cat_col = x_cat_col.astype(int).astype(str)
-                try:
-                    encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
-                except Exception as e:
-                    print(f"encountered unknown value when encoding partial table column: {df_info['cat_cols'][col]}")
-                    valid_mask = np.isin(x_cat_col, label_encoders[col].classes_)
-                    print("num invalids: ", (1 - valid_mask).sum())
-                    common = most_common_value(x_cat_col)
-                    x_cat_col_copy = x_cat_col.copy()
-                    x_cat_col_copy[~valid_mask] = common
-                    valid_mask = np.isin(x_cat_col_copy, label_encoders[col].classes_)
-                    encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
-            else:
-                encoded_x_cat.append(np.zeros_like(x_cat_col))  # this won't be looked at so doesn't matter
-        partial_table_encoded_cat = np.column_stack(encoded_x_cat)
-
-        partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
-        partial_table = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
-        partial_table = partial_table.to(device)
-
-
-
-    trainer.run_loop(for_reconstruction=for_reconstruction, partial_table=partial_table, known_features_mask=known_features_mask)
+    trainer.run_loop(for_reconstruction=for_reconstruction, known_features_mask=known_features_mask)
 
     if model_params["is_y_cond"] == "concat":
         column_orders = column_orders[1:] + [column_orders[0]]
@@ -813,6 +802,7 @@ def train_model(
         "dataset": dataset,
         "column_orders": column_orders,
     }
+
 
 class Classifier(nn.Module):
     def __init__(
@@ -958,7 +948,9 @@ def train_classifier(
     lr=0.0001,
 ):
     T = Transformations(**T_dict)
-    dataset, label_encoders, column_orders = make_dataset_from_df(
+    dataset, label_encoders, column_orders = make_data
+
+    set_from_df(
         df,
         T,
         is_y_cond=model_params["is_y_cond"],
@@ -1499,6 +1491,7 @@ def match_rows(A, B):
 
 def get_df_without_id(df):
     id_cols = [col for col in df.columns if "_id" in col]
+    id_cols = id_cols + [col for col in df.columns if "ID" in col]
     if "target" in df.columns:
         id_cols.append("target")
     return df.drop(columns=id_cols)

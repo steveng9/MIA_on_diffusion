@@ -6,9 +6,9 @@ import time
 
 import numpy as np
 import pandas as pd
-from sdv.metadata import MultiTableMetadata
+# from sdv.metadata import MultiTableMetadata
 
-from midst_models.single_table_TabDDPM.gen_multi_report import gen_multi_report
+# from midst_models.single_table_TabDDPM.gen_multi_report import gen_multi_report
 from midst_models.single_table_TabDDPM.pipeline_modules import *
 from midst_models.single_table_TabDDPM.pipeline_utils import *
 from midst_models.single_table_TabDDPM.tab_ddpm.utils import *
@@ -72,7 +72,7 @@ def clava_clustering(tables, relation_order, save_dir, configs):
 
 
 def clava_training(tables, relation_order, save_dir, configs,
-                   for_reconstruction=False, partial_data=None, known_features_mask=None):
+                   for_reconstruction=False, known_features_mask=None):
     models = {}
     for parent, child in relation_order:
         print(f"Training {parent} -> {child} model from scratch")
@@ -80,7 +80,7 @@ def clava_training(tables, relation_order, save_dir, configs,
         id_cols = [col for col in df_with_cluster.columns if "_id" in col]
         df_without_id = df_with_cluster.drop(columns=id_cols)
         result = child_training(
-            df_without_id, tables[child]["domain"], parent, child, configs, for_reconstruction=for_reconstruction, partial_data=partial_data, known_features_mask=known_features_mask,
+            df_without_id, tables[child]["domain"], parent, child, configs, for_reconstruction=for_reconstruction, known_features_mask=known_features_mask,
         )
         models[(parent, child)] = result
         pickle.dump(
@@ -89,6 +89,18 @@ def clava_training(tables, relation_order, save_dir, configs,
         )
 
     return models
+
+
+def clava_training_CUSTOM(tables, configs, for_reconstruction, known_features_mask):
+    child = list(tables.keys())[0]
+    print(f"Training {child} model from scratch")
+    df_with_cluster = tables[child]["df"]
+    id_cols = [col for col in df_with_cluster.columns if "_id" in col]
+    df_without_id = df_with_cluster.drop(columns=id_cols)
+    model = child_training(
+        df_without_id, tables[child]["domain"], None, child, configs, for_reconstruction=for_reconstruction, known_features_mask=known_features_mask,
+    )
+    return model
 
 
 
@@ -276,6 +288,9 @@ def clava_synthesizing(
         if "account_id" in tables[key]["original_cols"]:
             cols = tables[key]["original_cols"]
             cols.remove("account_id")
+        elif "ID" in tables[key]["original_cols"]:
+            cols = tables[key]["original_cols"]
+            cols.remove("ID")
         else:
             cols = tables[key]["original_cols"]
         cleaned_tables[key] = val[cols]
@@ -305,23 +320,22 @@ def clava_synthesizing(
 def clava_reconstructing(
     tables,
     relation_order,
-    save_dir,
     all_group_lengths_prob_dicts,
-    models,
+    model,
     configs,
     partial_table,
     known_features_mask,
     reconstruct_method_RePaint,
+    resamples,
+    jump,
     sample_scale=1,
-    resamples=None,
-    jump=None,
 ):
     synthetic_tables = {}
 
     # Synthesize
     _parent, child = relation_order[0]
     assert _parent is None
-    result = models[(_parent, child)]
+    # result = models[(_parent, child)]
     df_with_cluster = tables[child]["df"]
     df_without_id = get_df_without_id(df_with_cluster)
     sample_size = len(partial_table)
@@ -329,14 +343,14 @@ def clava_reconstructing(
 
     _, child_generated = reconstruct_from_diffusion(
         df=df_without_id,
-        df_info=result["df_info"],
-        diffusion=result["diffusion"],
-        dataset=result["dataset"],
-        label_encoders=result["label_encoders"],
+        df_info=model["df_info"],
+        diffusion=model["diffusion"],
+        dataset=model["dataset"],
+        label_encoders=model["label_encoders"],
         # sample_size=int(sample_scale * len(df_without_id)),
         sample_size=sample_size,
-        model_params=result["model_params"],
-        T_dict=result["T_dict"],
+        model_params=model["model_params"],
+        T_dict=model["T_dict"],
         partial_table=partial_table,
         known_features_mask=known_features_mask,
         reconstruct_method_RePaint=reconstruct_method_RePaint,
@@ -344,65 +358,15 @@ def clava_reconstructing(
         resamples=resamples,
         jump=jump,
     )
-    child_keys = list(range(len(child_generated)))
-    generated_final_arr = np.concatenate(
-        [np.array(child_keys).reshape(-1, 1), child_generated.to_numpy()],
-        axis=1,
-    )
     generated_final_df = pd.DataFrame(
-        generated_final_arr,
-        columns=[f"{child}_id"]
-        + result["df_info"]["num_cols"]
-        + result["df_info"]["cat_cols"]
-        + [result["df_info"]["y_col"]],
+        child_generated.to_numpy(),
+        columns=model["df_info"]["num_cols"]
+        + model["df_info"]["cat_cols"]
+        + [model["df_info"]["y_col"]],
     )
     # generated_final_df = generated_final_df[tables[child]['df'].columns]
-    generated_final_df = generated_final_df[
-        [f"{child}_id"] + df_without_id.columns.tolist()
-    ]
-    synthetic_tables[(_parent, child)] = {
-        "df": generated_final_df,
-        "keys": child_keys,
-    }
-    pickle.dump(
-        synthetic_tables,
-        open(os.path.join(save_dir, "before_matching/synthetic_tables.pkl"), "wb"),
-    )
-
-    # Matching
-    final_tables = {}
-    final_tables[child] = synthetic_tables[(_parent, child)]["df"]
-
-    cleaned_tables = {}
-    for key, val in final_tables.items():
-        if "account_id" in tables[key]["original_cols"]:
-            cols = tables[key]["original_cols"]
-            cols.remove("account_id")
-        else:
-            cols = tables[key]["original_cols"]
-        if 'target' in cols:
-            cols.remove('target')
-        cleaned_tables[key] = val[cols]
-    #
-    # for key, val in cleaned_tables.items():
-    #     table_dir = os.path.join(
-    #         configs["general"]["workspace_dir"],
-    #         configs["general"]["exp_name"],
-    #         key,
-    #         f'{configs["general"]["sample_prefix"]}_final',
-    #     )
-    #     os.makedirs(table_dir, exist_ok=True)
-    #     if f"{key}_id" in val.columns:
-    #         val.to_csv(
-    #             os.path.join(table_dir, f"{key}_synthetic_with_id.csv"), index=False
-    #         )
-    #         val_no_id = val.drop(columns=[f"{key}_id"])
-    #         val_no_id.to_csv(
-    #             os.path.join(table_dir, f"{key}_synthetic.csv"), index=False
-    #         )
-    #     else:
-    #         val.to_csv(os.path.join(table_dir, f"{key}_synthetic.csv"), index=False)
-    return cleaned_tables
+    generated_final_df = generated_final_df[df_without_id.columns.tolist()]
+    return generated_final_df
 
 
 

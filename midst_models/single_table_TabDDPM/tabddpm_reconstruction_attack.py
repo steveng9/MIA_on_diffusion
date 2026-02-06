@@ -1,3 +1,9 @@
+from sys import meta_path
+
+from torch.nn.functional import dropout
+
+from midst_models.single_table_TabDDPM.pipeline_utils import load_multi_table_CUSTOM
+
 ON_UW_SERVER = False
 
 import sys
@@ -18,6 +24,7 @@ sys.path.append("../../")
 import category_encoders
 from complex_pipeline import (
     clava_clustering,
+    clava_training_CUSTOM,
     clava_training,
     clava_load_pretrained,
     clava_synthesizing,
@@ -28,18 +35,28 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-num_epochs = 200_000
-resamples = 10
-jump = lambda t: max(0, t-10)
-# jump = lambda t: math.floor(t*.75)
-num_epochs_classifier = 20_000
+
+def jump_max10(t):
+    return max(0, t-10)
+
+def jump_threeQuarter(t):
+    return math.floor(t*.75)
+
+dropout_default = 0.1
+batch_size_default = 4096
+lr_default =  0.0006
+weight_decay_default = 1e-05
+num_epochs_default = 100_000
+num_timesteps_default = 1000
+resamples_default = 10
+jump_default = jump_max10
 
 reconstruction = True
-reconstruct_method_RePaint = True
+# reconstruct_method_RePaint = True
 verbose = False
-# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/NIST_Red-Team_Problems1-24_v2/"
-data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/golobs/Documents/GradSchool/NIST-CRC-25/25_PracticeProblem/"
-DATA_NAME = "25_Demo_MST_e10_25f"
+# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/NIST_CRC/NIST_Red-Team_Problems1-24_v2/"
+# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/NIST_CRC/25_PracticeProblem/"
+# DATA_NAME = "25_Demo_MST_e10_25f"
 # DATA_NAME = "25_Demo_CellSupression_25f"
 # DATA_NAME = "7_MST_e10_25f_QID1"
 # DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
@@ -119,49 +136,34 @@ def one_feature_at_a_time_attack():
 
 
 
-def train_diffusion(data_name, qi=QI, hidden_features=HIDDEN):
+def train_diffusion(data_name):
     print(f"\nTraining TabDDPM with {num_epochs} epochs\n\n")
-    ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
+    ATTACK_ARTIFACTS = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/attack_artifacts_nist_crc/"
     MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
     targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
     print(f"targets_name : {targets_name}")
     targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[qi]
     DATA_DIR = data_path
-    if reconstruction:
-        dataset_name = data_name + "_Deid"
-    else:
-        dataset_name = "25_Demo_25f_OriginalData_noID"
+    dataset_name = "25_Demo_25f_OriginalData_noID"
     # dataset_name = "refined_training_data"
 
-    config_path = "configs_nist_crc/crc_data.json"
+    meta_path = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/configs_nist_crc/"
+    config_path = meta_path + "crc_data.json"
     configs, _ = load_configs(config_path, MODEL_PATH)
 
     configs["diffusion"]["iterations"] = num_epochs
-    configs["classifier"]["iterations"] = num_epochs_classifier
+    # configs["classifier"]["iterations"] = num_epochs_classifier
 
-    tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir="configs_nist_crc/", dataset_name=dataset_name)
+    tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir=meta_path, dataset_name=dataset_name)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
 
-    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
+    # partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
     column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     if 'target' in column_order:
         column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
 
-    partial_data = partial_data[column_order]
-    known_features_mask = np.zeros((len(partial_data), 25))
-    known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
-
-    # models = clava_training_for_reconstruction(tables, relation_order, MODEL_PATH, configs)
-    if reconstruction:
-        models = clava_training(tables, relation_order, MODEL_PATH, configs,
-            for_reconstruction=not reconstruct_method_RePaint,
-            partial_data=partial_data,
-            known_features_mask=known_features_mask)
-    else:
-        models = clava_training(tables, relation_order, MODEL_PATH, configs,
-             for_reconstruction=False)
-    # models, tables, all_group_lengths_prob_dicts, dataset_meta, relation_order, configs = train_diffusion_for_attack(num_epochs, MODEL_PATH, DATA_DIR, dataset_name)
+    models = clava_training(tables, relation_order, MODEL_PATH, configs,
+         for_reconstruction=False)
 
     os.makedirs(MODEL_PATH + f"/e{num_epochs}", exist_ok=True)
     dump_artifact(models, MODEL_PATH + f"/model")
@@ -171,89 +173,23 @@ def train_diffusion(data_name, qi=QI, hidden_features=HIDDEN):
     dump_artifact(relation_order, MODEL_PATH + f"/relation_order")
     dump_artifact(configs, MODEL_PATH + f"/configs")
 
-
-def reconstruct_data(data_name, qi=QI, hidden_features=HIDDEN):
-    print(f"\nReconstructing TabDDPM \n\n")
-    ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
-    MODEL_PATH = ATTACK_ARTIFACTS + f"models"
-    targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
-    print(f"targets_name : {targets_name}")
-    targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[qi]
-
-    models = load_artifact(MODEL_PATH + f"/e{num_epochs}/model")
-    tables = load_artifact(MODEL_PATH + f"/e{num_epochs}/tables")
-    all_group_lengths_prob_dicts = load_artifact(MODEL_PATH + f"/e{num_epochs}/all_group_lengths_prob_dicts")
-    dataset_meta = load_artifact(MODEL_PATH + f"/e{num_epochs}/dataset_meta")
-    relation_order = load_artifact(MODEL_PATH + f"/e{num_epochs}/relation_order")
-    configs = load_artifact(MODEL_PATH + f"/e{num_epochs}/configs")
-    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
-
-    column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
-    if 'target' in column_order:
-        column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
-
-    partial_data = partial_data[column_order]
-    known_features_mask = np.zeros((len(partial_data), 25))
-    known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
-
-    cleaned_tables = clava_reconstructing(
-        tables,
-        relation_order,
-        ATTACK_ARTIFACTS + "models",
-        all_group_lengths_prob_dicts,
-        models,
-        configs,
-        partial_data,
-        known_features_mask,
-        reconstruct_method_RePaint,
-        sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
-        resamples=resamples,
-        jump=jump,
-    )
-
-    # Cast int values that saved as string to int for further evaluation
-    for key in cleaned_tables.keys():
-        for col in cleaned_tables[key].columns:
-            if cleaned_tables[key][col].dtype == "object":
-                try:
-                    cleaned_tables[key][col] = cleaned_tables[key][col].astype(int)
-                except ValueError:
-                    print(f"Column {col} cannot be converted to int.")
-
-    reconstructed = cleaned_tables['crc_data']
-    reconstructed.to_csv(data_path + f"reconstructed_{data_name}.csv")
-
-
-    reconstruction_scores = pd.DataFrame(index=features_25)
-    scores = calculate_reconstruction_score(targets, reconstructed, hidden_features)
-    reconstruction_scores.loc[hidden_features, "tabddpm_recon"] = scores
-
-    print(f"\n\nDeid = {data_name}:\n")
-    for x in reconstruction_scores.loc[sorted(hidden_features), "tabddpm_recon"].T.to_numpy():
-        print(x, end=",")
-    print(np.array(scores).mean())
-    return np.array(scores).mean()
-
-
-
-def gen_synth_data():
+def generate_synth_data():
     print(f"\nSynthesizing TabDDPM \n\n")
     ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
-    MODEL_PATH = ATTACK_ARTIFACTS + f"models"
+    MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
 
 
-    models = load_artifact(MODEL_PATH + f"/e{num_epochs}/model")
-    tables = load_artifact(MODEL_PATH + f"/e{num_epochs}/tables")
-    all_group_lengths_prob_dicts = load_artifact(MODEL_PATH + f"/e{num_epochs}/all_group_lengths_prob_dicts")
-    dataset_meta = load_artifact(MODEL_PATH + f"/e{num_epochs}/dataset_meta")
-    relation_order = load_artifact(MODEL_PATH + f"/e{num_epochs}/relation_order")
-    configs = load_artifact(MODEL_PATH + f"/e{num_epochs}/configs")
+    models = load_artifact(MODEL_PATH + f"/model")
+    tables = load_artifact(MODEL_PATH + f"/tables")
+    all_group_lengths_prob_dicts = load_artifact(MODEL_PATH + f"/all_group_lengths_prob_dicts")
+    dataset_meta = load_artifact(MODEL_PATH + f"/dataset_meta")
+    relation_order = load_artifact(MODEL_PATH + f"/relation_order")
+    configs = load_artifact(MODEL_PATH + f"/configs")
 
     cleaned_tables, synthesizing_time_spent, matching_time_spent = clava_synthesizing(
         tables,
         relation_order,
-        ATTACK_ARTIFACTS + "models",
+        MODEL_PATH,
         all_group_lengths_prob_dicts,
         models,
         configs,
@@ -279,11 +215,139 @@ def gen_synth_data():
         synth_final.to_csv(data_path + f"TabDDPM_generated_1.csv")
 
 
+
+def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_features, reconstruct_method_RePaint=False):
+
+    # ATTACK_ARTIFACTS = cfg["dataset"].get("")
+    # MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
+    # targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
+    # print(f"targets_name : {targets_name}")
+    # targets = pd.read_csv(data_path + targets_name + ".csv")
+    # DATA_DIR = data_path
+    # dataset_name = data_name + "_Deid"
+    # dataset_name = "refined_training_data"
+
+    # partial_data = targets[qi]
+
+    # meta_path = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/configs_nist_crc/"
+    # config_path = meta_path + "crc_data.json"
+
+    diffusion_config = make_config_for_diffusion_model(cfg)
+    # diffusion_config["diffusion"]["iterations"] = cfg["attack_params"].get("num_epochs", num_epochs_default)
+
+    tables, relation_order, dataset_meta = load_multi_table_CUSTOM(meta, domain, synth)
+    tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, cfg["dataset"]["artifacts"], diffusion_config)
+
+    # TODO: fix this band-aid
+    # partial_data[hidden_features] = synth[hidden_features] # NOTE: temporary measure to make dimensionality match training data
+
+    # all_columns = qi + hidden_features
+    # column_order = tables['crc_data']['df'][all_columns].columns
+    column_order = qi + hidden_features # all_columns # todo: can I just do this instead?
+
+    # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
+    # if 'target' in column_order:
+    #     column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
+
+    # partial_data = partial_data[column_order]
+    # known_features_mask = np.zeros((len(partial_data), len(column_order)))
+    known_features_mask = np.zeros((len(synth), len(column_order)))
+    known_features_mask[:, [synth.columns.get_loc(col) for col in qi]] = 1
+
+    model = clava_training_CUSTOM(tables, diffusion_config, not reconstruct_method_RePaint, known_features_mask)
+
+    dump_artifact(model, cfg["dataset"]["artifacts"] + f"/model_ckpt.pkl")
+    dump_artifact(tables, cfg["dataset"]["artifacts"] + f"/tables.pkl")
+    dump_artifact(all_group_lengths_prob_dicts, cfg["dataset"]["artifacts"] + f"/all_group_lengths_prob_dicts.pkl")
+    # dump_artifact(dataset_meta, cfg["dataset"]["artifacts"] + f"/dataset_meta.pkl")
+    dump_artifact(relation_order, cfg["dataset"]["artifacts"] + f"/relation_order.pkl")
+    dump_artifact(diffusion_config, cfg["dataset"]["artifacts"] + f"/configs.pkl")
+    dump_artifact(known_features_mask, cfg["dataset"]["artifacts"] + f"/known_features_mask.pkl")
+
+
+def reconstruct_data(cfg, targets, qi, hidden_features, reconstruct_method_RePaint=False):
+    # print(f"\nReconstructing TabDDPM \n\n")
+    # ATTACK_ARTIFACTS = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/attack_artifacts_nist_crc/"
+    # MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
+    # targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
+    # print(f"targets_name : {targets_name}")
+    # targets = pd.read_csv(data_path + targets_name + ".csv")
+    partial_data = targets[qi]
+
+    model = load_artifact(cfg["dataset"]["artifacts"] + f"/model_ckpt.pkl")
+    tables = load_artifact(cfg["dataset"]["artifacts"] + f"/tables.pkl")
+    all_group_lengths_prob_dicts = load_artifact(cfg["dataset"]["artifacts"] + f"/all_group_lengths_prob_dicts.pkl")
+    # dataset_meta = load_artifact(cfg["dataset"]["artifacts"] + f"/dataset_meta.pkl")
+    relation_order = load_artifact(cfg["dataset"]["artifacts"] + f"/relation_order.pkl")
+    configs = load_artifact(cfg["dataset"]["artifacts"] + f"/configs.pkl")
+    known_features_mask = load_artifact(cfg["dataset"]["artifacts"] + f"/known_features_mask.pkl")
+
+    # TODO: fix this band-aid
+    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
+
+    # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
+    column_order = qi + hidden_features
+
+    # if 'target' in column_order:
+    #     column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
+
+    partial_data = partial_data[column_order]
+    # known_features_mask = np.zeros((len(partial_data), len(column_order)))
+    # known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
+
+    reconstructed = clava_reconstructing(
+        tables,
+        relation_order,
+        all_group_lengths_prob_dicts,
+        model,
+        configs,
+        partial_data,
+        known_features_mask,
+        reconstruct_method_RePaint,
+        cfg["attack_params"].get("resamples", resamples_default),
+        globals()[cfg["attack_params"].get("jump_fn", jump_default.__name__)],
+        sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
+    )
+
+    # TODO: make option for continuous vs. categorical vs. int values
+    # Cast int values that saved as string to int for further evaluation
+    for col in reconstructed.columns:
+        if reconstructed[col].dtype == "object":
+            try:
+                reconstructed[col] = reconstructed[col].astype(int)
+            except ValueError:
+                print(f"Column {col} cannot be converted to int.")
+
+    reconstructed.to_csv(cfg["dataset"]["artifacts"] + f"/reconstructed.csv")
+    return reconstructed
+
+
+
 ################################################################
 ##########         HELPER FUNCTIONS          ###################
 ################################################################
 
-
+def make_config_for_diffusion_model(cfg):
+    return {
+        # "general": {
+        #     "sample_prefix": "",
+        # },
+        "diffusion": {
+            "d_layers": cfg["attack_params"]["hidden_dims"],
+            "dropout": cfg["attack_params"].get("dropout", dropout_default),
+            "num_timesteps": cfg["attack_params"].get("num_timesteps", num_timesteps_default),
+            "model_type": "mlp",
+            "iterations": cfg["attack_params"].get("num_epochs", num_epochs_default),
+            "batch_size": cfg["attack_params"].get("batch_size", batch_size_default),
+            "lr": cfg["attack_params"].get("lr", lr_default),
+            "gaussian_loss_type": "mse",
+            "weight_decay": cfg["attack_params"].get("weight_decay", weight_decay_default),
+            "scheduler": "cosine"
+        },
+        "sampling": { # TODO: do I need this?
+            "batch_size": 20000,
+        },
+    }
 
 
 
@@ -314,6 +378,6 @@ def calculate_reconstruction_score(df_original, df_reconstructed, hidden_feature
 
 
 if __name__ == '__main__':
-    # main_attack()
-    one_feature_at_a_time_attack()
+    main_attack()
+    # one_feature_at_a_time_attack()
 
