@@ -789,7 +789,12 @@ def train_model(
         device=device,
     )
 
-    trainer.run_loop(for_reconstruction=for_reconstruction, known_features_mask=known_features_mask)
+    mask = known_features_mask
+    if not torch.is_tensor(mask):
+        mask = torch.tensor(mask)
+
+    mask = mask.to(device)
+    trainer.run_loop(for_reconstruction=for_reconstruction, known_features_mask=mask)
 
     if model_params["is_y_cond"] == "concat":
         column_orders = column_orders[1:] + [column_orders[0]]

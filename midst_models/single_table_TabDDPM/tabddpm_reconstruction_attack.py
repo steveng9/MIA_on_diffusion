@@ -74,30 +74,6 @@ features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 
 
 
 
-def main_attack():
-    if torch.cuda.is_available(): print("Using CUDA device :)")
-    else: print("NOT Using CUDA!")
-    data_names = [
-        # "25_Demo_AIM_e1_25f",
-        # "25_Demo_ARF_25f",
-        # "25_Demo_CellSupression_25f",
-        "25_Demo_MST_e10_25f",
-        # "25_Demo_RANKSWAP_25f",
-        # "25_Demo_Synthpop_25f",
-        # "25_Demo_TVAE_25f",
-    ]
-
-    for data_name in data_names:
-        print(f"\n\n\n\n\n")
-
-        train_diffusion(data_name)
-        if reconstruction:
-            reconstruct_data(data_name)
-        else:
-            gen_synth_data()
-
-
-
 def one_feature_at_a_time_attack():
     if torch.cuda.is_available(): print("Using CUDA device :)")
     else: print("NOT Using CUDA!")
@@ -124,95 +100,12 @@ def one_feature_at_a_time_attack():
             synth_with_only_one_hidden_features.to_csv(data_path + data_name_reduced + "_Deid.csv", index=False)
             train_diffusion(data_name_reduced, qi=QI, hidden_features=[hidden_feature])
 
-            score = reconstruct_data(data_name_reduced, qi=QI, hidden_features=[hidden_feature])
+            score = reconstruct_data_categorical(data_name_reduced, qi=QI, hidden_features=[hidden_feature])
             print("SCORE for ", hidden_feature, score)
             scores.append(score)
         print()
         print()
         print(scores)
-
-
-
-
-
-
-def train_diffusion(data_name):
-    print(f"\nTraining TabDDPM with {num_epochs} epochs\n\n")
-    ATTACK_ARTIFACTS = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/attack_artifacts_nist_crc/"
-    MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
-    targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
-    print(f"targets_name : {targets_name}")
-    targets = pd.read_csv(data_path + targets_name + ".csv")
-    DATA_DIR = data_path
-    dataset_name = "25_Demo_25f_OriginalData_noID"
-    # dataset_name = "refined_training_data"
-
-    meta_path = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/configs_nist_crc/"
-    config_path = meta_path + "crc_data.json"
-    configs, _ = load_configs(config_path, MODEL_PATH)
-
-    configs["diffusion"]["iterations"] = num_epochs
-    # configs["classifier"]["iterations"] = num_epochs_classifier
-
-    tables, relation_order, dataset_meta = load_multi_table(DATA_DIR, metadata_dir=meta_path, dataset_name=dataset_name)
-    tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, MODEL_PATH, configs)
-
-    # partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
-    column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
-    if 'target' in column_order:
-        column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
-
-    models = clava_training(tables, relation_order, MODEL_PATH, configs,
-         for_reconstruction=False)
-
-    os.makedirs(MODEL_PATH + f"/e{num_epochs}", exist_ok=True)
-    dump_artifact(models, MODEL_PATH + f"/model")
-    dump_artifact(tables, MODEL_PATH + f"/tables")
-    dump_artifact(all_group_lengths_prob_dicts, MODEL_PATH + f"/all_group_lengths_prob_dicts")
-    dump_artifact(dataset_meta, MODEL_PATH + f"/dataset_meta")
-    dump_artifact(relation_order, MODEL_PATH + f"/relation_order")
-    dump_artifact(configs, MODEL_PATH + f"/configs")
-
-def generate_synth_data():
-    print(f"\nSynthesizing TabDDPM \n\n")
-    ATTACK_ARTIFACTS = "attack_artifacts_nist_crc/"
-    MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
-
-
-    models = load_artifact(MODEL_PATH + f"/model")
-    tables = load_artifact(MODEL_PATH + f"/tables")
-    all_group_lengths_prob_dicts = load_artifact(MODEL_PATH + f"/all_group_lengths_prob_dicts")
-    dataset_meta = load_artifact(MODEL_PATH + f"/dataset_meta")
-    relation_order = load_artifact(MODEL_PATH + f"/relation_order")
-    configs = load_artifact(MODEL_PATH + f"/configs")
-
-    cleaned_tables, synthesizing_time_spent, matching_time_spent = clava_synthesizing(
-        tables,
-        relation_order,
-        MODEL_PATH,
-        all_group_lengths_prob_dicts,
-        models,
-        configs,
-        sample_scale=1 if "debug" not in configs else configs["debug"]["sample_scale"],
-    )
-
-    print("\nSynthesizing Complete!\n")
-    for key in cleaned_tables.keys():
-        print(f"{key}:")
-
-    # Cast int values that saved as string to int for further evaluation
-    synth_final = None
-    for key in cleaned_tables.keys():
-        for col in cleaned_tables[key].columns:
-            if cleaned_tables[key][col].dtype == "object":
-                try:
-                    cleaned_tables[key][col] = cleaned_tables[key][col].astype(int)
-                except ValueError:
-                    print(f"Column {col} cannot be converted to int.")
-
-        synth_final = cleaned_tables[key]
-
-        synth_final.to_csv(data_path + f"TabDDPM_generated_1.csv")
 
 
 
@@ -265,7 +158,7 @@ def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_feat
     dump_artifact(known_features_mask, cfg["dataset"]["artifacts"] + f"/known_features_mask.pkl")
 
 
-def reconstruct_data(cfg, targets, qi, hidden_features, reconstruct_method_RePaint=False):
+def reconstruct_data_categorical(cfg, targets, qi, hidden_features, reconstruct_method_RePaint=False):
     # print(f"\nReconstructing TabDDPM \n\n")
     # ATTACK_ARTIFACTS = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/attack_artifacts_nist_crc/"
     # MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
@@ -329,9 +222,6 @@ def reconstruct_data(cfg, targets, qi, hidden_features, reconstruct_method_RePai
 
 def make_config_for_diffusion_model(cfg):
     return {
-        # "general": {
-        #     "sample_prefix": "",
-        # },
         "diffusion": {
             "d_layers": cfg["attack_params"]["hidden_dims"],
             "dropout": cfg["attack_params"].get("dropout", dropout_default),
@@ -345,7 +235,7 @@ def make_config_for_diffusion_model(cfg):
             "scheduler": "cosine"
         },
         "sampling": { # TODO: do I need this?
-            "batch_size": 20000,
+            "batch_size": 10_000,
         },
     }
 
@@ -375,6 +265,35 @@ def calculate_reconstruction_score(df_original, df_reconstructed, hidden_feature
         score = ( (df_original[col].values == df_reconstructed[col].values) * rarity_scores ).sum()
         scores.append(round(score / max_score * 100, 1))
     return scores
+
+
+def calculate_continuous_vals_reconstruction_score(train, reconstruction, hidden_features):
+    results = {}
+    for hidden_feature in hidden_features:
+        real = train[hidden_feature].values
+        recon = reconstruction[hidden_feature].values
+
+        # Normalize by range of real data
+        data_range = real.max() - real.min()
+
+        if data_range == 0:
+            # Constant column
+            normalized_error = 0 if np.allclose(real, recon) else np.inf
+        else:
+            # Normalized absolute error
+            normalized_error = np.abs(real - recon) / data_range
+
+        results[hidden_feature] = {
+            'mean_abs_error': np.mean(np.abs(real - recon)),
+            'normalized_mae': np.mean(normalized_error),
+            'mse': np.mean((real - recon) ** 2),
+            'rmse': np.sqrt(np.mean((real - recon) ** 2)),
+            'normalized_rmse': np.sqrt(np.mean(normalized_error ** 2)),
+            'max_error': np.max(np.abs(real - recon))
+        }
+
+    return pd.DataFrame(results).T
+
 
 
 if __name__ == '__main__':

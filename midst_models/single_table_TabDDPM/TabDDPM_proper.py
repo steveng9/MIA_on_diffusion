@@ -32,8 +32,8 @@ dropout_default = 0.1
 batch_size_default = 4096
 lr_default =  0.0006
 weight_decay_default = 1e-05
-num_epochs_default = 100_000
-num_timesteps_default = 1000
+# num_epochs_default = 100_000
+# num_timesteps_default = 1000
 verbose = True
 
 DATA_DIR = "/home/golobs/data/NIST_CRC/25_PracticeProblem/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/reconstruction_project/data/nist_arizona_data/NIST_CRC/25_PracticeProblem/"
