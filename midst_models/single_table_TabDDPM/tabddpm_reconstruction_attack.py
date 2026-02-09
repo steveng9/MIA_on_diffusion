@@ -51,15 +51,7 @@ num_timesteps_default = 1000
 resamples_default = 10
 jump_default = jump_max10
 
-reconstruction = True
-# reconstruct_method_RePaint = True
 verbose = False
-# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/NIST_CRC/NIST_Red-Team_Problems1-24_v2/"
-# data_path = "/home/golobs/data/" if ON_UW_SERVER else "/Users/stevengolob/Documents/school/PhD/NIST_CRC/25_PracticeProblem/"
-# DATA_NAME = "25_Demo_MST_e10_25f"
-# DATA_NAME = "25_Demo_CellSupression_25f"
-# DATA_NAME = "7_MST_e10_25f_QID1"
-# DATA_NAME = "19_CELL_SUPPRESSION_25f_QID1"
 
 
 # QI 1
@@ -137,6 +129,7 @@ def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_feat
     # all_columns = qi + hidden_features
     # column_order = tables['crc_data']['df'][all_columns].columns
     column_order = qi + hidden_features # all_columns # todo: can I just do this instead?
+    synth = synth[column_order]
 
     # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     # if 'target' in column_order:
@@ -145,7 +138,8 @@ def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_feat
     # partial_data = partial_data[column_order]
     # known_features_mask = np.zeros((len(partial_data), len(column_order)))
     known_features_mask = np.zeros((len(synth), len(column_order)))
-    known_features_mask[:, [synth.columns.get_loc(col) for col in qi]] = 1
+    # known_features_mask[:, [synth.columns.get_loc(col) for col in qi]] = 1
+    known_features_mask[:, :len(qi)] = 1
 
     model = clava_training_CUSTOM(tables, diffusion_config, not reconstruct_method_RePaint, known_features_mask)
 

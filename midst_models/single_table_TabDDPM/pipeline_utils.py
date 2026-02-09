@@ -586,8 +586,11 @@ def reconstruct_from_diffusion(
         dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
     )
 
-    partial_table_repositioned = partial_table.loc[:, df_info["num_cols"] + df_info["cat_cols"]].to_numpy()
-    known_features_mask = torch.from_numpy(known_features_mask[:, [list(partial_table.columns).index(col) for col in df_info['num_cols']] + [list(partial_table.columns).index(col) for col in df_info['cat_cols']]])
+    old_column_order = partial_table.columns.tolist()
+    new_column_order = df_info["num_cols"] + df_info["cat_cols"]
+    partial_table_repositioned_ = partial_table.loc[:, new_column_order]
+    partial_table_repositioned = partial_table_repositioned_.to_numpy()
+    known_features_mask_repositioned = torch.from_numpy(known_features_mask[:, [old_column_order.index(col) for col in new_column_order]])
 
 
     actual_num_numerical_features = num_numerical_features - len(label_encoders)
@@ -596,7 +599,7 @@ def reconstruct_from_diffusion(
     encoded_x_cat = []
     for col in range(partial_cat_.shape[1]):
         x_cat_col = partial_cat_[:, col]
-        if known_features_mask[0, col+actual_num_numerical_features] == 1:
+        if known_features_mask_repositioned[0, col+actual_num_numerical_features] == 1:
             x_cat_col = x_cat_col.astype(int).astype(str)
             try:
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
@@ -633,7 +636,7 @@ def reconstruct_from_diffusion(
         torch.from_numpy(dataset.y["train"]), return_counts=True
     )
     x_gen, y_gen = diffusion.reconstruct_all(
-        sample_batch_size, empirical_class_dist.float(), known_features_mask, partial_table_encoded, reconstruct_method_RePaint, resamples=resamples, jump=jump, ddim=False
+        sample_batch_size, empirical_class_dist.float(), known_features_mask_repositioned, partial_table_encoded, reconstruct_method_RePaint, resamples=resamples, jump=jump, ddim=False
     )
     X_gen, y_gen = x_gen.numpy(), y_gen.numpy()
     num_numerical_features_sample = num_numerical_features + int(
