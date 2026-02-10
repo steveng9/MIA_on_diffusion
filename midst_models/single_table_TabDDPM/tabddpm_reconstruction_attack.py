@@ -120,16 +120,17 @@ def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_feat
     diffusion_config = make_config_for_diffusion_model(cfg)
     # diffusion_config["diffusion"]["iterations"] = cfg["attack_params"].get("num_epochs", num_epochs_default)
 
+    # all_columns = qi + hidden_features
+    # column_order = tables['crc_data']['df'][all_columns].columns
+    column_order = qi + hidden_features # all_columns # todo: can I just do this instead?
+    synth = synth[column_order]
+
     tables, relation_order, dataset_meta = load_multi_table_CUSTOM(meta, domain, synth)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, cfg["dataset"]["artifacts"], diffusion_config)
 
     # TODO: fix this band-aid
     # partial_data[hidden_features] = synth[hidden_features] # NOTE: temporary measure to make dimensionality match training data
 
-    # all_columns = qi + hidden_features
-    # column_order = tables['crc_data']['df'][all_columns].columns
-    column_order = qi + hidden_features # all_columns # todo: can I just do this instead?
-    synth = synth[column_order]
 
     # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
     # if 'target' in column_order:

@@ -610,7 +610,6 @@ def reconstruct_from_diffusion(
                 common = most_common_value(x_cat_col)
                 x_cat_col_copy = x_cat_col.copy()
                 x_cat_col_copy[~valid_mask] = common
-                valid_mask = np.isin(x_cat_col_copy, label_encoders[col].classes_)
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
         else:
             encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
@@ -618,9 +617,6 @@ def reconstruct_from_diffusion(
 
     partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
     partial_table_encoded = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
-
-
-
 
     num_numerical_features = (
         dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
@@ -742,13 +738,13 @@ def train_model(
         std=0,
     )
     # print(dataset.n_features)
-    train_loader = prepare_fast_dataloader(
-        dataset, split="train", batch_size=batch_size, y_type="long"
-    )
-
-    num_numerical_features = (
-        dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
-    )
+    # train_loader = prepare_fast_dataloader(
+    #     dataset, split="train", batch_size=batch_size, y_type="long"
+    # )
+    #
+    # num_numerical_features = (
+    #     dataset.X_num["train"].shape[1] if dataset.X_num is not None else 0
+    # )
 
     K = np.array(dataset.get_category_sizes("train"))
     if len(K) == 0 or T_dict["cat_encoding"] == "one-hot":

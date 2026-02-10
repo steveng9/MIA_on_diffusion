@@ -138,6 +138,8 @@ def make_dataset_from_df(df, T, is_y_cond, ratios=[0.7, 0.2, 0.1], df_info=None,
     column_orders = num_column_orders + cat_column_orders
     column_orders = [index_to_column[index] for index in column_orders]
 
+
+    # Here's where we begin label encoding discrete features
     label_encoders = {}
     if X_cat is not None and len(df_info["cat_cols"]) > 0:
         X_cat_all = np.vstack((X_cat["train"], X_cat["val"], X_cat["test"]))
