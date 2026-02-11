@@ -330,8 +330,6 @@ def clava_reconstructing(
     jump,
     sample_scale=1,
 ):
-    synthetic_tables = {}
-
     # Synthesize
     _parent, child = relation_order[0]
     assert _parent is None

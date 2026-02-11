@@ -592,7 +592,6 @@ def reconstruct_from_diffusion(
     partial_table_repositioned = partial_table_repositioned_.to_numpy()
     known_features_mask_repositioned = torch.from_numpy(known_features_mask[:, [old_column_order.index(col) for col in new_column_order]])
 
-
     actual_num_numerical_features = num_numerical_features - len(label_encoders)
     partial_num_ = partial_table_repositioned[:, :actual_num_numerical_features]
     partial_cat_ = partial_table_repositioned[:, actual_num_numerical_features:]
@@ -788,7 +787,10 @@ def train_model(
         device=device,
     )
 
-    mask = known_features_mask
+    old_column_order = df.columns.tolist()
+    new_column_order = df_info["num_cols"] + df_info["cat_cols"]
+    known_features_mask_repositioned = known_features_mask[:,[old_column_order.index(x) for x in new_column_order]]
+    mask = known_features_mask_repositioned
     if not torch.is_tensor(mask):
         mask = torch.tensor(mask)
 
