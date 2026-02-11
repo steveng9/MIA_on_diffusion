@@ -612,9 +612,11 @@ def reconstruct_from_diffusion(
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col_copy))
         else:
             encoded_x_cat.append(np.zeros_like(x_cat_col)) # this won't be looked at so doesn't matter
-    partial_table_encoded_cat = np.column_stack(encoded_x_cat)
-
-    partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
+    if len(encoded_x_cat) > 0:
+        partial_table_encoded_cat = np.column_stack(encoded_x_cat)
+        partial_table_encoded = np.concatenate((partial_num_, partial_table_encoded_cat), axis=1)
+    else:
+        partial_table_encoded = partial_num_
     partial_table_encoded = torch.from_numpy(dataset.num_transform.transform(partial_table_encoded))
 
     num_numerical_features = (

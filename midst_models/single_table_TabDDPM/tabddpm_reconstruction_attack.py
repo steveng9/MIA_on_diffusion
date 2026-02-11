@@ -1,36 +1,22 @@
-from sys import meta_path
-
-from torch.nn.functional import dropout
-
 from midst_models.single_table_TabDDPM.pipeline_utils import load_multi_table_CUSTOM
 
 ON_UW_SERVER = False
 
 import sys
-import os
-import json
 import pandas as pd
 import numpy as np
 import pickle
 import math
-from argparse import Namespace
-from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader
 import torch.profiler
 
 sys.path.append("../../")
-import category_encoders
 from complex_pipeline import (
     clava_clustering,
     clava_training_CUSTOM,
-    clava_training,
-    clava_load_pretrained,
-    clava_synthesizing,
-    load_configs, clava_reconstructing,
+    clava_reconstructing,
 )
-from pipeline_modules import load_multi_table
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -63,7 +49,6 @@ HIDDEN = ['F23', 'F13', 'F11', 'F43', 'F36', 'F15', 'F33', 'F25', 'F18', 'F5', '
 # HIDDEN = ['F11', 'F43', 'F5', 'F36', 'F25', 'F47', 'F32', 'F15', 'F33', 'F17', 'F10', 'F12', 'F2', 'F1', 'F50', 'F22', 'F9', 'F21']
 
 features_25 = ['F1', 'F2', 'F3', 'F5', 'F9', 'F10', 'F11', 'F12', 'F13', 'F15', 'F17', 'F18', 'F21', 'F22', 'F23', 'F25', 'F30', 'F32', 'F33', 'F36', 'F37', 'F41', 'F43', 'F47', 'F50']
-
 
 
 def one_feature_at_a_time_attack():
@@ -100,46 +85,13 @@ def one_feature_at_a_time_attack():
         print(scores)
 
 
-
 def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_features, reconstruct_method_RePaint=False):
-
-    # ATTACK_ARTIFACTS = cfg["dataset"].get("")
-    # MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
-    # targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
-    # print(f"targets_name : {targets_name}")
-    # targets = pd.read_csv(data_path + targets_name + ".csv")
-    # DATA_DIR = data_path
-    # dataset_name = data_name + "_Deid"
-    # dataset_name = "refined_training_data"
-
-    # partial_data = targets[qi]
-
-    # meta_path = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/configs_nist_crc/"
-    # config_path = meta_path + "crc_data.json"
-
     diffusion_config = make_config_for_diffusion_model(cfg)
-    # diffusion_config["diffusion"]["iterations"] = cfg["attack_params"].get("num_epochs", num_epochs_default)
-
-    # all_columns = qi + hidden_features
-    # column_order = tables['crc_data']['df'][all_columns].columns
-    column_order = qi + hidden_features # all_columns # todo: can I just do this instead?
+    column_order = qi + hidden_features
     synth = synth[column_order]
-
     tables, relation_order, dataset_meta = load_multi_table_CUSTOM(meta, domain, synth)
     tables, all_group_lengths_prob_dicts = clava_clustering(tables, relation_order, cfg["dataset"]["artifacts"], diffusion_config)
-
-    # TODO: fix this band-aid
-    # partial_data[hidden_features] = synth[hidden_features] # NOTE: temporary measure to make dimensionality match training data
-
-
-    # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
-    # if 'target' in column_order:
-    #     column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
-
-    # partial_data = partial_data[column_order]
-    # known_features_mask = np.zeros((len(partial_data), len(column_order)))
     known_features_mask = np.zeros((len(synth), len(column_order)))
-    # known_features_mask[:, [synth.columns.get_loc(col) for col in qi]] = 1
     known_features_mask[:, :len(qi)] = 1
 
     model = clava_training_CUSTOM(tables, diffusion_config, not reconstruct_method_RePaint, known_features_mask)
@@ -147,41 +99,23 @@ def train_diffusion_for_reconstruction(cfg, meta, domain, synth, qi, hidden_feat
     dump_artifact(model, cfg["dataset"]["artifacts"] + f"/model_ckpt.pkl")
     dump_artifact(tables, cfg["dataset"]["artifacts"] + f"/tables.pkl")
     dump_artifact(all_group_lengths_prob_dicts, cfg["dataset"]["artifacts"] + f"/all_group_lengths_prob_dicts.pkl")
-    # dump_artifact(dataset_meta, cfg["dataset"]["artifacts"] + f"/dataset_meta.pkl")
     dump_artifact(relation_order, cfg["dataset"]["artifacts"] + f"/relation_order.pkl")
     dump_artifact(diffusion_config, cfg["dataset"]["artifacts"] + f"/configs.pkl")
     dump_artifact(known_features_mask, cfg["dataset"]["artifacts"] + f"/known_features_mask.pkl")
 
 
 def reconstruct_data_categorical(cfg, targets, qi, hidden_features, reconstruct_method_RePaint=False):
-    # print(f"\nReconstructing TabDDPM \n\n")
-    # ATTACK_ARTIFACTS = "/Users/stevengolob/PycharmProjects/MIA_on_diffusion/midst_models/single_table_TabDDPM/attack_artifacts_nist_crc/"
-    # MODEL_PATH = ATTACK_ARTIFACTS + f"models/e{num_epochs}"
-    # targets_name = "25_Demo_25f_OriginalData" if "Demo" in data_name else data_name + "_AttackTargets"
-    # print(f"targets_name : {targets_name}")
-    # targets = pd.read_csv(data_path + targets_name + ".csv")
-    partial_data = targets[qi]
-
     model = load_artifact(cfg["dataset"]["artifacts"] + f"/model_ckpt.pkl")
     tables = load_artifact(cfg["dataset"]["artifacts"] + f"/tables.pkl")
     all_group_lengths_prob_dicts = load_artifact(cfg["dataset"]["artifacts"] + f"/all_group_lengths_prob_dicts.pkl")
-    # dataset_meta = load_artifact(cfg["dataset"]["artifacts"] + f"/dataset_meta.pkl")
     relation_order = load_artifact(cfg["dataset"]["artifacts"] + f"/relation_order.pkl")
     configs = load_artifact(cfg["dataset"]["artifacts"] + f"/configs.pkl")
     known_features_mask = load_artifact(cfg["dataset"]["artifacts"] + f"/known_features_mask.pkl")
 
-    # TODO: fix this band-aid
-    partial_data[hidden_features] = tables['crc_data']['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
-
-    # column_order = tables['crc_data']['df'].drop(['placeholder'], axis=1).columns
+    partial_data = targets[qi]
+    partial_data[hidden_features] = list(tables.values())[0]['df'][hidden_features] # NOTE: temporary measure to make dimensionality match training data
     column_order = qi + hidden_features
-
-    # if 'target' in column_order:
-    #     column_order = tables['crc_data']['df'].drop(['placeholder', 'target'], axis=1).columns
-
     partial_data = partial_data[column_order]
-    # known_features_mask = np.zeros((len(partial_data), len(column_order)))
-    # known_features_mask[:, [partial_data.columns.get_loc(col) for col in qi]] = 1
 
     reconstructed = clava_reconstructing(
         tables,
@@ -292,6 +226,5 @@ def calculate_continuous_vals_reconstruction_score(train, reconstruction, hidden
 
 
 if __name__ == '__main__':
-    main_attack()
-    # one_feature_at_a_time_attack()
+    one_feature_at_a_time_attack()
 
