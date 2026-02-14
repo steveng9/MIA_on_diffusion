@@ -789,14 +789,15 @@ def train_model(
         device=device,
     )
 
-    old_column_order = df.columns.tolist()
-    new_column_order = df_info["num_cols"] + df_info["cat_cols"]
-    known_features_mask_repositioned = known_features_mask[:,[old_column_order.index(x) for x in new_column_order]]
-    mask = known_features_mask_repositioned
-    if not torch.is_tensor(mask):
-        mask = torch.tensor(mask)
-
-    mask = mask.to(device)
+    mask = None
+    if known_features_mask is not None:
+        old_column_order = df.columns.tolist()
+        new_column_order = df_info["num_cols"] + df_info["cat_cols"]
+        known_features_mask_repositioned = known_features_mask[:,[old_column_order.index(x) for x in new_column_order]]
+        mask = known_features_mask_repositioned
+        if not torch.is_tensor(mask):
+            mask = torch.tensor(mask)
+        mask = mask.to(device)
     trainer.run_loop(for_reconstruction=for_reconstruction, known_features_mask=mask)
 
     if model_params["is_y_cond"] == "concat":
