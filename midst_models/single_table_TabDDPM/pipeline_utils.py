@@ -1499,8 +1499,11 @@ def match_rows(A, B):
 
 
 def get_df_without_id(df):
-    id_cols = [col for col in df.columns if "_id" in col]
-    id_cols = id_cols + [col for col in df.columns if "ID" in col]
+    # Drop FK/PK id columns and the placeholder target.
+    # Use endswith("ID") rather than "ID" in col to avoid false positives on data
+    # columns that happen to contain the substring "ID" (e.g. PROVIDE1, HOLIDAYS,
+    # INDIVIDUALS, OPSOUTSIDE in nist_sbo). endswith catches HHID-style columns.
+    id_cols = [col for col in df.columns if "_id" in col or str(col).endswith("ID")]
     if "target" in df.columns:
         id_cols.append("target")
     return df.drop(columns=id_cols)
