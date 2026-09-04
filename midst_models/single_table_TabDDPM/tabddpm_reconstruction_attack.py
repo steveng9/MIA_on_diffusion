@@ -25,6 +25,12 @@ warnings.filterwarnings("ignore")
 def jump_max10(t):
     return max(0, t-10)
 
+def jump_max20(t):
+    return max(0, t-20)
+
+def jump_max50(t):
+    return max(0, t-50)
+
 def jump_threeQuarter(t):
     return math.floor(t*.75)
 
@@ -164,7 +170,7 @@ def make_config_for_diffusion_model(cfg):
             "scheduler": "cosine"
         },
         "sampling": { # TODO: do I need this?
-            "batch_size": 10_000,
+            "batch_size": 20000,
         },
     }
 

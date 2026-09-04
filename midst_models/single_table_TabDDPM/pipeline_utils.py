@@ -599,7 +599,10 @@ def reconstruct_from_diffusion(
     for col in range(partial_cat_.shape[1]):
         x_cat_col = partial_cat_[:, col]
         if known_features_mask_repositioned[0, col+actual_num_numerical_features] == 1:
-            x_cat_col = x_cat_col.astype(int).astype(str)
+            try:
+                x_cat_col = x_cat_col.astype(float).astype(int).astype(str)
+            except (ValueError, TypeError):
+                x_cat_col = x_cat_col.astype(str)
             try:
                 encoded_x_cat.append(label_encoders[col].transform(x_cat_col))
             except Exception as e:
